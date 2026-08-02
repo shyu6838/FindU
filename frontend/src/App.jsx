@@ -3,95 +3,137 @@ import Home from './pages/Home';
 import ReportForm from './pages/ReportForm';
 import Login from './pages/Login';
 import MyPage from './pages/MyPage';
+import ItemList from './pages/ItemList';
+import PostDetail from './pages/PostDetail'; 
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+
+  const handleNavigate = (page, itemData = null) => {
+    if (itemData) {
+      setSelectedItem(itemData); 
+    }
+    setCurrentPage(page); 
+  };
 
   const requireLogin = (page) => {
     if (!isLoggedIn) {
       alert("로그인이 필요한 서비스입니다.");
       setCurrentPage('login');
     } else {
-      setCurrentPage(page);
+      handleNavigate(page);
     }
   };
 
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <Home changePage={setCurrentPage} requireLogin={requireLogin} />;
+        return <Home changePage={handleNavigate} requireLogin={requireLogin} />;
+      
       case 'report':
-        return <ReportForm setCurrentPage={setCurrentPage} />;
+        return <ReportForm setCurrentPage={handleNavigate} initialType="lost" />;
+      
+      case 'report-lost':
+        return <ReportForm setCurrentPage={handleNavigate} initialType="lost" />;
+      
+      case 'report-found':
+        return <ReportForm setCurrentPage={handleNavigate} initialType="found" />;
+
       case 'login':
-        return <Login setIsLoggedIn={setIsLoggedIn} setCurrentPage={setCurrentPage} />;
+        return <Login setIsLoggedIn={setIsLoggedIn} setCurrentPage={handleNavigate} />;
+      
       case 'mypage':
         return <MyPage />;
       
-      // 분실물 목록
       case 'lost-list':
         return (
-          <div style={{ padding: '80px 20px', textAlign: 'center', color: 'black' }}>
-            <h2 style={{ color: 'black', fontSize: '28px', fontWeight: 'bold', marginBottom: '15px' }}>분실물 목록</h2>
-            <p style={{ color: 'black', fontSize: '16px', fontWeight: '500' }}>추후 등록된 모든 분실물 목록을 보여주는 페이지가 구현될 예정입니다.</p>
-          </div>
+          <ItemList 
+            mode="lost" 
+            onNavigate={handleNavigate} 
+            isLoggedIn={isLoggedIn} 
+          />
         );
       
-      // 습득물 목록
       case 'found-list':
         return (
-          <div style={{ padding: '80px 20px', textAlign: 'center', color: 'black' }}>
-            <h2 style={{ color: 'black', fontSize: '28px', fontWeight: 'bold', marginBottom: '15px' }}>습득물 목록</h2>
-            <p style={{ color: 'black', fontSize: '16px', fontWeight: '500' }}>추후 등록된 모든 습득물 목록을 보여주는 페이지가 구현될 예정입니다.</p>
-          </div>
+          <ItemList 
+            mode="found" 
+            onNavigate={handleNavigate} 
+            isLoggedIn={isLoggedIn} 
+          />
+        );
+
+      case 'detail':
+        return (
+          <PostDetail 
+            item={selectedItem} 
+            onNavigate={handleNavigate} 
+          />
         );
 
       default:
-        return <Home changePage={setCurrentPage} requireLogin={requireLogin} />;
+        return <Home changePage={handleNavigate} requireLogin={requireLogin} />;
     }
   };
 
+  // 💡 수정된 네비게이션 아이템 스타일
   const navItemStyle = {
     cursor: 'pointer',
-    marginLeft: '20px',
+    marginLeft: '24px',
     fontWeight: '500',
-    color: 'black'
+    color: '#374151',
+    fontSize: '15px',
+    transition: 'color 0.2s ease',
   };
 
+  // 💡 수정된 신고하기 버튼 스타일 (깔끔한 파란색 포인트)
   const reportButtonStyle = {
     cursor: 'pointer',
-    marginLeft: '20px',
-    padding: '8px 16px',
-    backgroundColor: '#fff',
-    color: '#000',
-    border: '2px solid #000',
-    borderRadius: '4px',
+    marginLeft: '24px',
+    padding: '9px 18px',
+    backgroundColor: '#2563eb',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
     fontWeight: 'bold',
-    boxShadow: '2px 2px 0px #000'
+    fontSize: '14px',
+    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+    transition: 'background-color 0.2s ease',
   };
 
   return (
-    <div style={{ color: 'black', backgroundColor: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-      
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 30px', borderBottom: '1px solid #eee', backgroundColor: 'white' }}>
+    <div style={{ color: '#111827', backgroundColor: '#ffffff', minHeight: '100vh', fontFamily: "'Pretendard', sans-serif" }}>
+      {/* 💡 상단 헤더 / 네비게이션바 */}
+      <header style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        padding: '16px 36px', 
+        borderBottom: '1px solid #e5e7eb', 
+        backgroundColor: '#ffffff',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100
+      }}>
         <h1 
-          style={{ cursor: 'pointer', fontSize: '24px', margin: 0, color: 'black', fontWeight: 'bold' }} 
-          onClick={() => setCurrentPage('home')}
+          style={{ cursor: 'pointer', fontSize: '24px', margin: 0, color: '#111827', fontWeight: 'bold', letterSpacing: '-0.5px' }} 
+          onClick={() => handleNavigate('home')}
         >
           FindU
         </h1>
         <nav style={{ display: 'flex', alignItems: 'center' }}>
-          <span style={navItemStyle} onClick={() => setCurrentPage('home')}>홈</span>
-          <span style={navItemStyle} onClick={() => setCurrentPage('lost-list')}>분실물 목록</span>
-          <span style={navItemStyle} onClick={() => setCurrentPage('found-list')}>습득물 목록</span>
+          <span style={navItemStyle} onClick={() => handleNavigate('home')}>홈</span>
+          <span style={navItemStyle} onClick={() => handleNavigate('lost-list')}>분실물 목록</span>
+          <span style={navItemStyle} onClick={() => handleNavigate('found-list')}>습득물 목록</span>
           <span style={reportButtonStyle} onClick={() => requireLogin('report')}>신고하기</span>
           <span style={navItemStyle} onClick={() => alert('실시간 알림 기능은 준비 중입니다. (추후 드롭다운 구현 예정)')}>알림</span>
           <span style={navItemStyle} onClick={() => requireLogin('mypage')}>마이페이지</span>
         </nav>
       </header>
 
-      {/* 메인 영역 */}
-      <main style={{ backgroundColor: 'white' }}>
+      <main style={{ backgroundColor: '#ffffff' }}>
         {renderPage()}
       </main>
     </div>
