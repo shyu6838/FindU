@@ -7,7 +7,7 @@ import lombok.*;
 @Entity
 @Getter
 @Builder
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Table(name = "users")
 public class User extends BaseEntity {
@@ -16,17 +16,46 @@ public class User extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String email;
 
     @Column(nullable = false)
     private String nickname;
 
+    @Column
     private String profileImage;
 
+    @Builder.Default
     @Column(nullable = false)
-    private Integer trustScore;
+    private Integer trustScore = 0;
 
     @Enumerated(EnumType.STRING)
-    private Role role;
+    @Builder.Default
+    @Column(nullable = false)
+    private Role role = Role.USER;
+
+    // ==========================
+    // 비즈니스 메서드
+    // ==========================
+
+    /**
+     * 닉네임 변경
+     */
+    public void updateNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    /**
+     * 프로필 이미지 변경
+     */
+    public void updateProfileImage(String profileImage) {
+        this.profileImage = profileImage;
+    }
+
+    /**
+     * 신뢰도 점수 변경
+     */
+    public void updateTrustScore(Integer trustScore) {
+        this.trustScore = trustScore;
+    }
 }
