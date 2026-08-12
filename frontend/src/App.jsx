@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import MyPage from './pages/MyPage';
 import ItemList from './pages/ItemList';
 import PostDetail from './pages/PostDetail'; 
+import ChatRoom from './pages/ChatRoom';
+import NotificationDropdown from './components/NotificationDropdown'; 
 
 const App = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -73,12 +75,21 @@ const App = () => {
           />
         );
 
+      // 채팅방 라우팅
+      case 'chat-room':
+        return (
+          <ChatRoom 
+            changePage={handleNavigate} 
+            postInfo={selectedItem} 
+          />
+        );
+
       default:
         return <Home changePage={handleNavigate} requireLogin={requireLogin} />;
     }
   };
 
-  // 💡 수정된 네비게이션 아이템 스타일
+  // 네비게이션 아이템 스타일
   const navItemStyle = {
     cursor: 'pointer',
     marginLeft: '24px',
@@ -88,7 +99,7 @@ const App = () => {
     transition: 'color 0.2s ease',
   };
 
-  // 💡 수정된 신고하기 버튼 스타일 (깔끔한 파란색 포인트)
+  // 신고하기 버튼 스타일
   const reportButtonStyle = {
     cursor: 'pointer',
     marginLeft: '24px',
@@ -105,7 +116,7 @@ const App = () => {
 
   return (
     <div style={{ color: '#111827', backgroundColor: '#ffffff', minHeight: '100vh', fontFamily: "'Pretendard', sans-serif" }}>
-      {/* 💡 상단 헤더 / 네비게이션바 */}
+      {/*상단 헤더 / 네비게이션바 */}
       <header style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
@@ -128,7 +139,9 @@ const App = () => {
           <span style={navItemStyle} onClick={() => handleNavigate('lost-list')}>분실물 목록</span>
           <span style={navItemStyle} onClick={() => handleNavigate('found-list')}>습득물 목록</span>
           <span style={reportButtonStyle} onClick={() => requireLogin('report')}>신고하기</span>
-          <span style={navItemStyle} onClick={() => alert('실시간 알림 기능은 준비 중입니다. (추후 드롭다운 구현 예정)')}>알림</span>
+          
+          
+<NotificationDropdown onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />          
           <span style={navItemStyle} onClick={() => requireLogin('mypage')}>마이페이지</span>
         </nav>
       </header>
