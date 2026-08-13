@@ -1,7 +1,9 @@
 package findu.backend.user.controller;
 
 import findu.backend.user.dto.UserResponseDto;
+import findu.backend.user.dto.UserUpdateRequestDto;
 import findu.backend.user.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -19,5 +21,14 @@ public class UserController {
             @AuthenticationPrincipal Long userId
     ) {
         return userService.getUser(userId);
+    }
+
+    // 내 정보 수정
+    @PatchMapping("/me")
+    public UserResponseDto updateMyInfo(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody UserUpdateRequestDto request
+    ) {
+        return userService.updateMyInfo(userId, request);
     }
 }
