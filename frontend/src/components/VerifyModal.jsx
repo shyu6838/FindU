@@ -31,7 +31,7 @@ export default function VerifyModal({ isOpen, onClose, question, onSuccess }) {
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         {/* 상단 헤더 */}
         <div style={headerStyle}>
-          <h3 style={titleStyle}>❓ 습득자 본인 확인 질문</h3>
+          <h3 style={titleStyle}>본인 확인 질문</h3>
           <button style={closeBtnStyle} onClick={onClose}>✕</button>
         </div>
 
