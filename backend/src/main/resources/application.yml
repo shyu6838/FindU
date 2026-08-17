@@ -58,3 +58,7 @@ logging:
 env:
   ignore-if-missing: false
   directory: ./
+
+ai:
+  server:
+    url: ${AI_SERVER_URL:http://localhost:8000}
