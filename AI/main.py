@@ -1,3 +1,4 @@
+import requests
 import io
 import os
 import pickle
@@ -71,27 +72,53 @@ def health_check():
 
 # [API 1] 분실물 이미지 등록 (자동 파일 저장 로직 포함)
 @app.post("/api/ai/register")
-async def register_item(item_id: int = Form(...), file: UploadFile = File(...)):
+async def register_item(
+        item_id: int = Form(...),
+        file: UploadFile | None = File(None),
+        image_url: str | None = Form(None)
+):
     global index, id_map
+
     try:
-        content = await file.read()
+        if file is not None:
+            content = await file.read()
+
+        elif image_url is not None:
+            response = requests.get(image_url, timeout=10)
+            response.raise_for_status()
+            content = response.content
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="file 또는 image_url이 필요합니다."
+            )
+
         image = Image.open(io.BytesIO(content)).convert("RGB")
 
         processed_image = preprocess(image).unsqueeze(0).to(device)
+
         with torch.no_grad():
             image_features = model.encode_image(processed_image)
             image_features /= image_features.norm(dim=-1, keepdim=True)
-            vector = image_features.cpu().numpy().astype('float32')
+            vector = image_features.cpu().numpy().astype("float32")
 
         index.add(vector)
         id_map.append(item_id)
 
-        # 등록 성공 시 디스크 파일로 즉시 영구 저장
         save_data()
 
-        return {"status": "success", "message": f"Item {item_id} registered and saved."}
+        return {
+            "status": "success",
+            "item_id": item_id,
+            "message": f"Item {item_id} registered and saved."
+        }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"등록 실패: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"등록 실패: {str(e)}"
+        )
 
 
 # [API 2] 자연어 검색 (번역 로직 포함)
@@ -129,14 +156,31 @@ def search_by_text(query: str, top_k: int = 5):
 
 # [API 3] 이미지 기반 유사 분실물 검색 (Image-to-Image Search)
 @app.post("/api/ai/search/image")
-async def search_by_image(file: UploadFile = File(...), top_k: int = 5):
+async def search_by_image(
+        file: UploadFile | None = File(None),
+        image_url: str | None = Form(None),
+        top_k: int = Form(5)
+):
     global index, id_map
 
     if index is None or index.ntotal == 0:
         return {"results": []}
 
     try:
-        content = await file.read()
+        if file is not None:
+            content = await file.read()
+
+        elif image_url is not None:
+            response = requests.get(image_url, timeout=10)
+            response.raise_for_status()
+            content = response.content
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="file 또는 image_url이 필요합니다."
+            )
+
         query_image = Image.open(io.BytesIO(content)).convert("RGB")
 
         processed_image = preprocess(query_image).unsqueeze(0).to(device)
