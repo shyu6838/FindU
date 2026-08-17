@@ -1,6 +1,7 @@
 package findu.backend.auth.handler;
 
-import findu.backend.security.jwt.JwtTokenProvider;
+import findu.backend.auth.dto.TokenResponse;
+import findu.backend.auth.service.AuthService;
 import findu.backend.user.entity.User;
 import findu.backend.user.repository.UserRepository;
 import jakarta.servlet.ServletException;
@@ -20,7 +21,7 @@ public class OAuth2LoginSuccessHandler
         extends SimpleUrlAuthenticationSuccessHandler {
 
     private final UserRepository userRepository;
-    private final JwtTokenProvider jwtTokenProvider;
+    private final AuthService authService;
 
     @Override
     public void onAuthenticationSuccess(
@@ -35,29 +36,38 @@ public class OAuth2LoginSuccessHandler
         String email =
                 oauthUser.getAttribute("email");
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new IllegalStateException("사용자를 찾을 수 없습니다.")
+        User user =
+                userRepository.findByEmail(email)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "사용자를 찾을 수 없습니다."
+                                )
+                        );
+
+        TokenResponse tokens =
+                authService.issueTokens(
+                        user.getId()
                 );
 
-        String accessToken =
-                jwtTokenProvider.createAccessToken(
-                        user.getId(),
-                        user.getEmail()
-                );
+        response.setContentType(
+                "application/json"
+        );
 
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
+        response.setCharacterEncoding(
+                "UTF-8"
+        );
 
         response.getWriter().write(
                 """
                 {
                     "accessToken": "%s",
+                    "refreshToken": "%s",
                     "userId": %d,
                     "email": "%s"
                 }
                 """.formatted(
-                        accessToken,
+                        tokens.getAccessToken(),
+                        tokens.getRefreshToken(),
                         user.getId(),
                         user.getEmail()
                 )
