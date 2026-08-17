@@ -3,6 +3,7 @@ package findu.backend.security.config;
 import findu.backend.auth.handler.OAuth2LoginSuccessHandler;
 import findu.backend.auth.service.CustomOAuth2UserService;
 import findu.backend.security.filter.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +41,22 @@ public class SecurityConfig {
                                 "/oauth2/**"
                         ).permitAll()
                         .anyRequest().authenticated()
+                )
+
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(
+                                (request, response, authException) -> {
+                                    response.setStatus(
+                                            HttpServletResponse.SC_UNAUTHORIZED
+                                    );
+                                    response.setContentType(
+                                            "application/json;charset=UTF-8"
+                                    );
+                                    response.getWriter().write(
+                                            "{\"message\":\"인증이 필요합니다.\"}"
+                                    );
+                                }
+                        )
                 )
 
                 .oauth2Login(oauth -> oauth
