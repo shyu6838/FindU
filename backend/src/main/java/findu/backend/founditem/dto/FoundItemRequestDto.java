@@ -1,0 +1,1 @@
+package findu.backend.founditem.dto; import jakarta.validation.constraints.*; import lombok.Getter; import java.time.LocalDateTime; @Getter public class FoundItemRequestDto{@NotNull Long categoryId; @NotBlank String title; @NotBlank String description; String imageUrl; String location; @NotNull LocalDateTime foundAt;}
