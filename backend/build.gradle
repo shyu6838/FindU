@@ -38,6 +38,10 @@ dependencies {
     // dotenv
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
+    // AWS S3
+    implementation platform('software.amazon.awssdk:bom:2.31.63')
+    implementation 'software.amazon.awssdk:s3'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
