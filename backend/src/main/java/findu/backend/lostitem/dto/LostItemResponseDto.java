@@ -1,0 +1,3 @@
+package findu.backend.lostitem.dto;
+import findu.backend.lostitem.entity.LostItem;
+import lombok.Builder; @Builder public record LostItemResponseDto(Long id,Long userId,String nickname,Long categoryId,String categoryName,String title,String description,String imageUrl,String location,java.time.LocalDateTime lostAt,java.time.LocalDateTime createdAt){ public static LostItemResponseDto from(LostItem x){return LostItemResponseDto.builder().id(x.getId()).userId(x.getUser().getId()).nickname(x.getUser().getNickname()).categoryId(x.getCategory().getId()).categoryName(x.getCategory().getName()).title(x.getTitle()).description(x.getDescription()).imageUrl(x.getImageUrl()).location(x.getLocation()).lostAt(x.getLostAt()).createdAt(x.getCreatedAt()).build();}}
