@@ -37,6 +37,10 @@ spring:
 server:
   port: 8080
 
+app:
+  frontend-url: http://localhost:5173
+
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 1800000
@@ -52,6 +56,7 @@ aws:
 
 logging:
   level:
+
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
 
