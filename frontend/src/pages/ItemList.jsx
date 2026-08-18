@@ -1,200 +1,181 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
-/**
- * [ItemList.jsx]
- * 분실물 및 습득물 목록을 보여주는 페이지 컴포넌트입니다.
- * - 주요 역할: 검색 및 카테고리 필터링, 목록 카드 형태로 출력, 신고하기/상세보기 페이지로 이동
- * - mode prop('lost' 또는 'found')에 따라 분실물/습득물 목록으로 동적으로 전환됩니다.
- */
-
-// ---------------------------------------------------------
-// 1. 임시 더미 데이터 및 상수 정의
-// ---------------------------------------------------------
-const MOCK_ITEMS = [
-  { id: 1, type: 'LOST', title: '검은색 가죽 지갑', category: '지갑', location: '인문관 3층 복도', date: '2026-07-24', status: 'FINDING', image: 'https://via.placeholder.com/250x180?text=Wallet', description: '도서관 근처에서 분실했습니다.' },
-  { id: 2, type: 'FOUND', title: '아이패드 에어 5세대', category: '전자기기', location: '중앙도서관 2층 열람실', date: '2026-07-25', status: 'KEEPING', image: 'https://via.placeholder.com/250x180?text=iPad', description: '열람실 책상 위에서 발견하여 학생회실에 보관 중입니다.' },
-  { id: 3, type: 'LOST', title: '에어팟 프로 2세대', category: '전자기기', location: '공학관 식당', date: '2026-07-23', status: 'FINDING', image: 'https://via.placeholder.com/250x180?text=AirPods', description: '본체 분실했습니다.' },
-  { id: 4, type: 'FOUND', title: '파란색 3단 우산', category: '기타', location: '학생회관 1층 입구', date: '2026-07-25', status: 'KEEPING', image: 'https://via.placeholder.com/250x180?text=Umbrella', description: '우산꽂이에 꽂혀있었습니다.' },
+// 카테고리 목록 정의
+const CATEGORIES = [
+  { id: 'ALL', name: '전체' },
+  { id: 1, name: '카드/신분증' },
+  { id: 2, name: '이어폰/헤드폰' },
+  { id: 3, name: '스마트폰/노트북/태블릿' },
+  { id: 4, name: '지갑' },
+  { id: 5, name: '책/노트/필기구' },
+  { id: 6, name: '가방/파우치' },
+  { id: 7, name: '의류/모자' },
+  { id: 8, name: '기타 전자기기' },
+  { id: 9, name: '기타' }
 ];
 
-const CATEGORIES = ['전체', '전자기기', '지갑', '의류', '전공서적/도서', '기타'];
+// 카테고리 ID 매핑 데이터
+const CATEGORY_MAP = {
+  1: '카드/신분증',
+  2: '이어폰/헤드폰',
+  3: '스마트폰/노트북/태블릿',
+  4: '지갑',
+  5: '책/노트/필기구',
+  6: '가방/파우치',
+  7: '의류/모자',
+  8: '기타 전자기기',
+  9: '기타'
+};
 
-// ---------------------------------------------------------
-// 2. 메인 컴포넌트
-// ---------------------------------------------------------
-export default function ItemList({ mode = 'lost', onNavigate, isLoggedIn }) {
-  // [상태 관리] 검색어와 선택된 카테고리
+// 분실물 및 습득물 목록 출력 컴포넌트
+export default function ItemList({ mode = 'lost', onNavigate }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('전체');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
 
-  // [로직 분기] mode 값에 따라 화면 텍스트 및 속성 설정
-  const isLostMode = mode === 'lost';
-  const pageTitle = isLostMode ? '분실물 목록' : '습득물 목록';
-  const pageSubtitle = isLostMode
-    ? '주인을 찾고 있는 분실물 정보 목록입니다.'
-    : '보관 중인 습득물 정보 목록입니다.';
-  const writeBtnText = isLostMode ? '분실물 신고하기' : '습득물 신고하기';
+  // 게시물 목록 데이터 조회
+  useEffect(() => {
+    setLoading(true);
+    const itemType = mode.toUpperCase();
+    
+    axios.get(`http://localhost:8080/api/items?type=${itemType}`)
+      .then(res => {
+        setItems(res.data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("목록 데이터 로딩 실패", err);
+        setLoading(false);
+      });
+  }, [mode]);
 
-  // [데이터 필터링] 탭(분실/습득), 카테고리, 검색어 조건에 맞게 데이터 필터링
-  const filteredItems = MOCK_ITEMS.filter((item) => {
-    const targetType = isLostMode ? 'LOST' : 'FOUND';
-    if (item.type !== targetType) return false;
+  // 응답 데이터 형태에 따른 카테고리명 추출
+  const getCategoryName = (item) => {
+    if (item.categoryName) return item.categoryName;
+    if (item.category) return item.category; 
+    if (item.categoryId && CATEGORY_MAP[item.categoryId]) return CATEGORY_MAP[item.categoryId];
+    return '기타';
+  };
 
-    const matchesCategory = selectedCategory === '전체' || item.category === selectedCategory;
-    const matchesSearch =
-      item.title.includes(searchTerm) ||
-      item.location.includes(searchTerm) ||
-      item.description.includes(searchTerm);
+  // 검색어 및 카테고리 필터링 적용
+  const filteredItems = items.filter(item => {
+    const itemCategoryName = getCategoryName(item);
+    
+    const matchesCategory = selectedCategory === 'ALL' || 
+      itemCategoryName === CATEGORY_MAP[selectedCategory];
+
+    const matchesSearch = searchTerm.trim() === '' ||
+      (item.title && item.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (item.content && item.content.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return matchesCategory && matchesSearch;
   });
 
-  // [이벤트 핸들러] 신고하기 버튼 클릭 시 로그인 여부 체크 후 이동
-  const handleWriteClick = () => {
-    if (!isLoggedIn) {
-      alert('글 작성은 로그인 후 이용할 수 있습니다.');
-      if (onNavigate) onNavigate('login');
-      return;
-    }
-    if (onNavigate) onNavigate(isLostMode ? 'report-lost' : 'report-found');
-  };
-
-  // [이벤트 핸들러] 아이템 카드 클릭 시 상세 페이지로 이동
-  const handleCardClick = (item) => {
+  // 게시물 상세 페이지 이동
+  const handleCardClick = (id) => {
     if (onNavigate) {
-      onNavigate('detail', item); 
+      onNavigate('post-detail', id);
     }
   };
 
   return (
-    <div style={styles.container}>
-      
-      {/* 1. 상단: 페이지 타이틀 및 서브 타이틀 */}
+    <div style={styles.page}>
       <div style={styles.header}>
-        <h1 style={styles.pageTitle}>{pageTitle}</h1>
-        <p style={styles.pageSubtitle}>{pageSubtitle}</p>
+        <h2 style={styles.title}>{mode === 'lost' ? '분실물 목록' : '습득물 목록'}</h2>
       </div>
 
-      {/* 2. 중단: 텍스트 검색 영역 */}
-      <div style={styles.searchSection}>
-        <div style={styles.searchBarContainer}>
-          <input
-            type="text"
-            placeholder={
-              isLostMode
-                ? "예: '도서관에서 잃어버린 검정 지갑' 검색"
-                : "예: '공학관 2층에서 주운 아이패드' 검색"
-            }
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={styles.searchInput}
-          />
-          <button style={styles.searchButton}>검색</button>
-        </div>
+      <div style={styles.searchBox}>
+        <input 
+          type="text" 
+          placeholder="물품명, 장소, 특징 등을 검색해보세요." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={styles.searchInput} 
+        />
       </div>
 
-      {/* 3. 중단: 카테고리 필터 및 신고하기 버튼 */}
-      <div style={styles.controlSection}>
-        <div style={styles.categoryGroup}>
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              style={{
-                ...styles.categoryBtn,
-                ...(selectedCategory === cat ? styles.categoryBtnActive : {}),
-              }}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        <button onClick={handleWriteClick} style={styles.writeButton}>
-          {writeBtnText}
-        </button>
+      <div style={styles.categoryContainer}>
+        {CATEGORIES.map(c => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => setSelectedCategory(c.id)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '20px',
+              border: selectedCategory === c.id ? 'none' : '1px solid #d1d5db',
+              backgroundColor: selectedCategory === c.id ? '#2563eb' : '#ffffff',
+              color: selectedCategory === c.id ? '#ffffff' : '#374151',
+              fontSize: '14px',
+              cursor: 'pointer',
+              fontWeight: selectedCategory === c.id ? 'bold' : 'normal',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {c.name}
+          </button>
+        ))}
       </div>
 
-      {/* 4. 하단: 필터링된 아이템 카드 그리드 목록 */}
-      <div style={styles.gridSection}>
-        {filteredItems.length > 0 ? (
-          filteredItems.map((item) => (
-            <div 
-              key={item.id} 
-              style={styles.card}
-              onClick={() => handleCardClick(item)}
-            >
-              {/* 4-1. 카드 상단: 썸네일 이미지 및 분실/습득 뱃지 */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>데이터를 불러오는 중입니다... ⏳</div>
+      ) : filteredItems.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>해당 조건에 맞는 게시물이 없습니다.</div>
+      ) : (
+        <div style={styles.grid}>
+          {filteredItems.map(item => (
+            <div key={item.id} style={styles.card} onClick={() => handleCardClick(item.id)}>
               <div style={styles.imageWrapper}>
-                <img src={item.image} alt={item.title} style={styles.cardImage} />
-                <span
-                  style={{
-                    ...styles.badge,
-                    backgroundColor: item.type === 'LOST' ? '#ff4d4f' : '#52c41a',
-                  }}
-                >
+                <img 
+                  src={item.imageUrl || "https://via.placeholder.com/300x200?text=No+Image"} 
+                  alt="물품 사진" 
+                  style={styles.cardImage} 
+                />
+                <span style={{
+                  ...styles.badge, 
+                  backgroundColor: item.type === 'LOST' ? '#ef4444' : '#10b981'
+                }}>
                   {item.type === 'LOST' ? '분실' : '습득'}
                 </span>
               </div>
-
-              {/* 4-2. 카드 하단: 상세 정보 텍스트 */}
               <div style={styles.cardContent}>
-                <div style={styles.cardCategory}>{item.category}</div>
+                <span style={styles.cardCategory}>{getCategoryName(item)}</span>
                 <h3 style={styles.cardTitle}>{item.title}</h3>
-                <p style={styles.cardInfo}>{item.location}</p>
-                <p style={styles.cardInfo}>📅 {item.date}</p>
-                <p style={styles.cardDesc}>{item.description}</p>
-
+                <p style={styles.cardInfo}>{item.location || '장소 미상'}</p>
+                <p style={styles.cardInfo}> {item.eventDate ? item.eventDate.split('T')[0] : '날짜 미상'}</p>
                 <div style={styles.cardFooter}>
-                  <span style={styles.statusText}>
-                    {item.status === 'FINDING' ? '찾는 중' : '보관 중'}
+                  <span style={{ fontWeight: 'bold', color: item.status === 'RESOLVED' ? '#6b7280' : '#2563eb' }}>
+                    {item.status === 'RESOLVED' ? '반환 완료' : '찾는 중'}
                   </span>
-                  <button style={styles.detailBtn}>상세보기</button>
                 </div>
               </div>
             </div>
-          ))
-        ) : (
-          <div style={styles.noData}>등록된 데이터가 없습니다. 🍃</div>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ---------------------------------------------------------
-// 3. UI 스타일 정의
-// ---------------------------------------------------------
 const styles = {
-  container: { maxWidth: '1100px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
-  header: { textAlign: 'center', marginBottom: '30px' },
-  pageTitle: { fontSize: '28px', fontWeight: 'bold', color: '#1f2937', marginBottom: '8px' },
-  pageSubtitle: { fontSize: '15px', color: '#6b7280' },
-  searchSection: { marginBottom: '25px' },
-  searchBarContainer: {
-    display: 'flex', gap: '10px', backgroundColor: '#ffffff',
-    border: '2px solid #1f2937', padding: '6px 12px', borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-  },
-  searchInput: { flex: 1, border: 'none', outline: 'none', backgroundColor: '#ffffff', color: '#000000', padding: '10px 8px', fontSize: '15px' },
-  searchButton: { backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', padding: '0 24px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' },
-  controlSection: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginBottom: '30px' },
-  categoryGroup: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
-  categoryBtn: { padding: '8px 16px', borderRadius: '20px', border: '1px solid #e5e7eb', backgroundColor: '#fff', color: '#4b5563', fontSize: '14px', cursor: 'pointer' },
-  categoryBtnActive: { backgroundColor: '#1f2937', color: '#fff', borderColor: '#1f2937', fontWeight: 'bold' },
-  writeButton: { backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', padding: '10px 18px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' },
-  gridSection: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '24px' },
-  card: { backgroundColor: '#fff', borderRadius: '14px', overflow: 'hidden', border: '1px solid #f3f4f6', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'transform 0.2s ease, box-shadow 0.2s ease' },
-  imageWrapper: { position: 'relative', width: '100%', height: '180px', backgroundColor: '#e5e7eb' },
+  page: { maxWidth: '1000px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
+  header: { marginBottom: '20px' },
+  title: { fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: 0 },
+  searchBox: { marginBottom: '16px' },
+  searchInput: { width: '100%', padding: '14px', border: '1px solid #d1d5db', borderRadius: '10px', fontSize: '15px', boxSizing: 'border-box', backgroundColor: '#ffffff', color: '#111827', colorScheme: 'light', outline: 'none' },
+  categoryContainer: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '30px' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' },
+  card: { backgroundColor: '#ffffff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', cursor: 'pointer', border: '1px solid #f3f4f6', display: 'flex', flexDirection: 'column' },
+  imageWrapper: { position: 'relative', width: '100%', height: '160px', backgroundColor: '#f3f4f6' },
   cardImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  badge: { position: 'absolute', top: '12px', left: '12px', color: '#fff', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' },
+  badge: { position: 'absolute', top: '12px', left: '12px', color: '#ffffff', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' },
   cardContent: { padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 },
   cardCategory: { fontSize: '12px', color: '#2563eb', fontWeight: 'bold', marginBottom: '4px' },
-  cardTitle: { fontSize: '16px', fontWeight: 'bold', color: '#111827', marginBottom: '8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  cardTitle: { fontSize: '16px', fontWeight: 'bold', color: '#111827', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   cardInfo: { fontSize: '13px', color: '#4b5563', margin: '2px 0' },
-  cardDesc: { fontSize: '12px', color: '#9ca3af', marginTop: '8px', marginBottom: '16px', lineHeight: '1.4', height: '34px', overflow: 'hidden' },
-  cardFooter: { marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #f3f4f6' },
-  statusText: { fontSize: '12px', color: '#6b7280', fontWeight: 'bold' },
-  detailBtn: { backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', cursor: 'pointer' },
-  noData: { gridColumn: '1 / -1', textAlign: 'center', padding: '60px 0', color: '#9ca3af', fontSize: '16px' }
+  cardFooter: { marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid #f3f4f6', fontSize: '13px' }
 };

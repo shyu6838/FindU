@@ -1,32 +1,15 @@
 import React from 'react';
 
-/**
- * [Login.jsx]
- * 서비스의 로그인 화면 컴포넌트입니다.
- * - 주요 역할: 학교 구글 계정을 이용한 OAuth 2.0 로그인 UI 제공
- * - 현재는 백엔드 연동 전이므로 '가짜 로그인(Mock Login)'으로 동작합니다.
- */
-
-// ---------------------------------------------------------
-// 1. 메인 컴포넌트
-// ---------------------------------------------------------
-export default function Login({ setCurrentPage, setView, setIsLoggedIn }) {
-  // Navigation 함수 (App.jsx의 라우팅 방식에 따라 대응)
-  const navigate = setCurrentPage || setView;
-
-  // [이벤트 핸들러] 가짜 로그인 처리
-  // 백엔드 API 연동 전까지 UI 테스트를 위해 임시로 로그인 상태를 true로 만듭니다.
-  const handleMockLogin = () => {
-    alert('구글 계정으로 로그인되었습니다!');
-    setIsLoggedIn(true);
-    if (navigate) {
-      navigate('home'); // 로그인 후 홈 화면으로 이동
-    }
+// 구글 OAuth 2.0 로그인 화면 컴포넌트
+export default function Login() {
+  
+  // 백엔드 구글 인증 진입점으로 리다이렉트
+  const handleGoogleLogin = () => {
+    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
   };
 
   return (
     <div style={styles.container}>
-      {/* 중앙 로그인 박스 */}
       <div style={styles.box}>
         <h2 style={styles.logo}>FindU</h2>
 
@@ -35,9 +18,7 @@ export default function Login({ setCurrentPage, setView, setIsLoggedIn }) {
           <strong style={{ color: '#111827' }}>학교 구글 계정</strong>으로 로그인해주세요.
         </p>
         
-        {/* 구글 로그인 버튼 */}
-        <button onClick={handleMockLogin} style={styles.googleButton}>
-          {/* 구글 G 로고 아이콘 모방 */}
+        <button onClick={handleGoogleLogin} style={styles.googleButton}>
           <span style={styles.googleIcon}>G</span> 
           Google 계정으로 로그인
         </button>
@@ -46,9 +27,7 @@ export default function Login({ setCurrentPage, setView, setIsLoggedIn }) {
   );
 }
 
-// ---------------------------------------------------------
-// 2. UI 스타일 정의
-// ---------------------------------------------------------
+// 스타일 설정
 const styles = {
   container: {
     display: 'flex',
