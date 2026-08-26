@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ReportModal from '../components/ReportModal';
 import VerifyModal from '../components/VerifyModal'; 
+import SimilarItemsModal from '../components/SimilarItemsModal'; 
+import ReviewModal from '../components/ReviewModal'; 
 
-// 게시글 상세 정보 확인 및 권한별 기능 처리 컴포넌트
 export default function PostDetail({ itemId, onNavigate }) {
   const [postData, setPostData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -13,8 +14,9 @@ export default function PostDetail({ itemId, onNavigate }) {
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
+  const [isSimilarModalOpen, setIsSimilarModalOpen] = useState(false); 
+  const [isReviewOpen, setIsReviewOpen] = useState(false); 
 
-  // 게시글 정보 및 현재 로그인한 사용자 정보 조회
   useEffect(() => {
     if (!itemId) return;
     
@@ -25,7 +27,7 @@ export default function PostDetail({ itemId, onNavigate }) {
     if (token) {
       api.get('/api/users/me')
         .then(res => setCurrentUserEmail(res.data.email))
-        .catch(err => console.error("유저 정보 로딩 실패", err));
+        .catch(() => {});
     }
 
     api.get(`/api/items/${itemId}`)
@@ -33,8 +35,7 @@ export default function PostDetail({ itemId, onNavigate }) {
         setPostData(res.data);
         setLoading(false);
       })
-      .catch(err => {
-        console.error("상세 정보 로딩 실패", err);
+      .catch(() => {
         setLoading(false);
       });
   }, [itemId]);
@@ -45,6 +46,7 @@ export default function PostDetail({ itemId, onNavigate }) {
   const isLost = postData.type === 'LOST';
   const typeLabel = isLost ? '분실' : '습득';
   const typeBgColor = isLost ? '#ef4444' : '#10b981';
+  
   const isMyPost = currentUserEmail && currentUserEmail === postData.writerEmail;
 
   // 로그인 상태 확인
@@ -71,7 +73,29 @@ export default function PostDetail({ itemId, onNavigate }) {
   // 게시글 수정 이동
   const handleEdit = () => onNavigate('edit-item', postData);
 
-  // 본인 확인 답안 제출 및 검증
+  // 완료 상태 업데이트
+  const handleResolve = async () => {
+    try {
+      await api.patch(`/api/items/${itemId}/status?status=RESOLVED`);
+      setPostData(prev => ({ ...prev, status: 'RESOLVED' }));
+    } catch (error) {
+      alert("완료 처리에 실패했습니다.");
+    }
+  };
+
+  // 완료 상태 취소
+  const handleCancelResolve = async () => {
+    if (!window.confirm("완료 처리를 취소하고 다시 '진행 중'으로 변경하시겠습니까?")) return;
+    try {
+      await api.patch(`/api/items/${itemId}/status?status=SEARCHING`);
+      setPostData(prev => ({ ...prev, status: 'SEARCHING' }));
+      alert("완료 처리가 취소되었습니다.");
+    } catch (error) {
+      alert("상태 변경에 실패했습니다.");
+    }
+  };
+
+  // 본인 확인 인증 처리
   const handleVerifySubmit = (inputAnswer) => {
     if (!postData.answer) return alert("등록된 정답 정보가 없습니다.");
     if (inputAnswer.trim().toLowerCase() === postData.answer.trim().toLowerCase()) {
@@ -84,7 +108,7 @@ export default function PostDetail({ itemId, onNavigate }) {
     }
   };
 
-  // 채팅 버튼 클릭 핸들러
+  // 채팅방 진입 핸들러
   const handleChatClick = () => {
     if (!checkLogin()) return; 
     if (isMyPost) return; 
@@ -101,6 +125,11 @@ export default function PostDetail({ itemId, onNavigate }) {
 
         {isMyPost && (
           <div style={{ display: 'flex', gap: '8px' }}>
+            {postData.status !== 'RESOLVED' ? (
+              <button style={styles.resolveBtn} onClick={() => setIsReviewOpen(true)}>✅ 완료 처리</button>
+            ) : (
+              <button style={styles.cancelBtn} onClick={handleCancelResolve}>↩️ 완료 취소</button>
+            )}
             <button style={styles.editBtn} onClick={handleEdit}>수정</button>
             <button style={styles.deleteBtn} onClick={handleDelete}>삭제</button>
           </div>
@@ -144,8 +173,20 @@ export default function PostDetail({ itemId, onNavigate }) {
 
           <div style={styles.actionGroup}>
             {isLost ? (
-              <button style={{ ...styles.actionBtn, backgroundColor: '#111827', color: '#fff' }} onClick={() => alert('유사 습득물 검색 진행')}>
-                유사 습득물 찾기
+              <button 
+                style={{ 
+                  ...styles.actionBtn, 
+                  backgroundColor: isMyPost ? '#111827' : '#f3f4f6', 
+                  color: isMyPost ? '#ffffff' : '#9ca3af',
+                  cursor: isMyPost ? 'pointer' : 'not-allowed'
+                }} 
+                onClick={() => {
+                  if (!isMyPost) return;
+                  setIsSimilarModalOpen(true);
+                }}
+                disabled={!isMyPost}
+              >
+                {isMyPost ? '유사 습득물 찾기' : '유사 습득물 찾기 (작성자 전용)'}
               </button>
             ) : (
               <button 
@@ -166,7 +207,7 @@ export default function PostDetail({ itemId, onNavigate }) {
                 }}
                 disabled={isMyPost}
               >
-                {isMyPost ? '본인 확인 (작성자)' : (isVerified ? '본인 확인 완료' : '본인 확인 질문 답하기')}
+                {isMyPost ? '본인 확인 (작성자)' : (isVerified ? '✅본인 확인 완료' : '본인 확인 질문 답하기')}
               </button>
             )}
 
@@ -184,7 +225,7 @@ export default function PostDetail({ itemId, onNavigate }) {
                 }} 
                 onClick={handleChatClick}
               >
-                작성자와 채팅하기
+                💬 작성자와 채팅하기
               </button>
             )}
           </div>
@@ -192,17 +233,33 @@ export default function PostDetail({ itemId, onNavigate }) {
       </div>
 
       <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetType="게시글" targetTitle={postData.title} />
+      
       {isVerifyOpen && (
         <VerifyModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} question={postData.question || '본인 확인 질문이 등록되지 않았습니다.'} onVerify={handleVerifySubmit} />
       )}
+      
+      <SimilarItemsModal 
+        isOpen={isSimilarModalOpen} 
+        onClose={() => setIsSimilarModalOpen(false)} 
+        baseItemTitle={postData.title}
+        baseItemCategoryId={postData.categoryId} 
+        onNavigate={onNavigate}
+      />
+
+      <ReviewModal 
+        isOpen={isReviewOpen} 
+        onClose={() => setIsReviewOpen(false)} 
+        onResolve={handleResolve}
+      />
     </div>
   );
 }
 
-// 스타일 설정
 const styles = {
   page: { maxWidth: '1000px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
   backButton: { background: 'none', border: 'none', color: '#4b5563', fontSize: '15px', cursor: 'pointer', padding: 0, fontWeight: 'bold' },
+  resolveBtn: { padding: '6px 14px', backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
+  cancelBtn: { padding: '6px 14px', backgroundColor: '#6b7280', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
   editBtn: { padding: '6px 14px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
   deleteBtn: { padding: '6px 14px', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
   contentWrapper: { display: 'flex', gap: '40px', backgroundColor: '#fff', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },

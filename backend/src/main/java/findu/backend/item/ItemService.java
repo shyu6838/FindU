@@ -1,5 +1,3 @@
-// ItemService.java
-
 package findu.backend.item;
 
 import findu.backend.category.entity.Category;
@@ -108,5 +106,14 @@ public class ItemService {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
         itemRepository.delete(item);
+    }
+
+    // 게시물 상태 업데이트
+    @Transactional
+    public void updateItemStatus(Long id, ItemStatus status) {
+        Item item = itemRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
+        
+        item.updateStatus(status); 
     }
 }

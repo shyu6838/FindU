@@ -62,4 +62,11 @@ public class ItemController {
         itemService.deleteItem(id, userEmail);
         return ResponseEntity.ok().build();
     }
+
+    // 상태 변경 API (RESOLVED 또는 SEARCHING)
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Void> updateItemStatus(@PathVariable Long id, @RequestParam String status) {
+        itemService.updateItemStatus(id, ItemStatus.valueOf(status));
+        return ResponseEntity.ok().build();
+    }
 }

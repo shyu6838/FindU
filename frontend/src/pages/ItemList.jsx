@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-// 카테고리 목록 정의
+// 카테고리 목록
 const CATEGORIES = [
   { id: 'ALL', name: '전체' },
   { id: 1, name: '카드/신분증' },
@@ -15,7 +15,7 @@ const CATEGORIES = [
   { id: 9, name: '기타' }
 ];
 
-// 카테고리 ID 매핑 데이터
+// 카테고리 매핑
 const CATEGORY_MAP = {
   1: '카드/신분증',
   2: '이어폰/헤드폰',
@@ -28,15 +28,14 @@ const CATEGORY_MAP = {
   9: '기타'
 };
 
-// 분실물 및 습득물 목록 출력 컴포넌트
+// 목록 컴포넌트
 export default function ItemList({ mode = 'lost', onNavigate }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
-  // 게시물 목록 데이터 조회
+  // 데이터 로드
   useEffect(() => {
     setLoading(true);
     const itemType = mode.toUpperCase();
@@ -46,13 +45,12 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
         setItems(res.data || []);
         setLoading(false);
       })
-      .catch(err => {
-        console.error("목록 데이터 로딩 실패", err);
+      .catch(() => {
         setLoading(false);
       });
   }, [mode]);
 
-  // 응답 데이터 형태에 따른 카테고리명 추출
+  // 카테고리명 추출
   const getCategoryName = (item) => {
     if (item.categoryName) return item.categoryName;
     if (item.category) return item.category; 
@@ -60,7 +58,7 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
     return '기타';
   };
 
-  // 검색어 및 카테고리 필터링 적용
+  // 필터링 적용
   const filteredItems = items.filter(item => {
     const itemCategoryName = getCategoryName(item);
     
@@ -75,7 +73,7 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
     return matchesCategory && matchesSearch;
   });
 
-  // 게시물 상세 페이지 이동
+  // 상세 페이지 이동
   const handleCardClick = (id) => {
     if (onNavigate) {
       onNavigate('post-detail', id);
@@ -128,7 +126,16 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
       ) : (
         <div style={styles.grid}>
           {filteredItems.map(item => (
-            <div key={item.id} style={styles.card} onClick={() => handleCardClick(item.id)}>
+            <div 
+              key={item.id} 
+              style={{
+                ...styles.card,
+                // 완료 상태 스타일 적용
+                opacity: item.status === 'RESOLVED' ? 0.5 : 1,
+                filter: item.status === 'RESOLVED' ? 'grayscale(80%)' : 'none'
+              }} 
+              onClick={() => handleCardClick(item.id)}
+            >
               <div style={styles.imageWrapper}>
                 <img 
                   src={item.imageUrl || "https://via.placeholder.com/300x200?text=No+Image"} 

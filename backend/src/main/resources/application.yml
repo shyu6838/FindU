@@ -21,8 +21,9 @@ spring:
       client:
         registration:
           google:
-            client-id: "Client ID"
-            client-secret: "Client Secret"
+            client-id: "ClientId"
+
+            client-secret: "ClientSecret"
             scope:
               - email
               - profile
