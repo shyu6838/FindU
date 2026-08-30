@@ -1,5 +1,3 @@
-// CustomOAuth2UserService.java
-
 package findu.backend.auth.service;
 
 import findu.backend.auth.info.GoogleUserInfo;
@@ -24,20 +22,21 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest userRequest) {
 
-        // 1. OAuth2 제공자로부터 사용자 정보 로드
+        // OAuth2 제공자로부터 사용자 정보 로드
         OAuth2User oauthUser = super.loadUser(userRequest);
         GoogleUserInfo userInfo = new GoogleUserInfo(oauthUser.getAttributes());
 
         String email = userInfo.getEmail();
         String nickname = userInfo.getNickname();
 
+        // 닉네임 생성 (이름이 없을 경우 이메일 앞자리 사용)
         if (nickname == null || nickname.isBlank()) {
             nickname = (email != null) ? email.split("@")[0] : "사용자";
         }
 
         final String finalNickname = nickname;
 
-        // 2. 신규 사용자일 경우 DB에 정보 저장
+        // 사용자 조회 및 신규 가입 처리
         userRepository.findByEmail(email)
                 .orElseGet(() ->
                         userRepository.save(

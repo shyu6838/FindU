@@ -1,20 +1,25 @@
-// App.jsx
-
 import React, { useState, useEffect } from 'react';
+
 import Home from './pages/Home';
 import ReportForm from './pages/ReportForm';
 import Login from './pages/Login';
+import OAuthCallback from './pages/OAuthCallback';
 import MyPage from './pages/MyPage';
 import ItemList from './pages/ItemList';
-import PostDetail from './pages/PostDetail'; 
+import PostDetail from './pages/PostDetail';
 import ChatRoom from './pages/ChatRoom';
-import NotificationDropdown from './components/NotificationDropdown'; 
-import OAuthCallback from './pages/OAuthCallback';
+import NotificationDropdown from './components/NotificationDropdown';
 
 // 최상위 라우팅 및 상태 관리 컴포넌트
 const App = () => {
-  const [currentPage, setCurrentPage] = useState('home');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentPage, setCurrentPage] = useState(() => {
+    if (window.location.pathname === '/auth/callback' || window.location.pathname === '/oauth/callback') {
+      return 'oauth-callback';
+    }
+    return 'home';
+  });
+  
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('accessToken'));
   const [selectedItem, setSelectedItem] = useState(null);
 
   // 로그인 상태 및 브라우저 히스토리 초기화 처리
@@ -23,7 +28,7 @@ const App = () => {
     if (token) setIsLoggedIn(true);
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get('token')) {
+    if (params.get('token') || params.get('accessToken') || window.location.pathname === '/auth/callback') {
       setCurrentPage('oauth-callback');
     }
 
@@ -39,7 +44,7 @@ const App = () => {
     
     window.addEventListener('popstate', handlePopState);
 
-    if (!params.get('token')) {
+    if (!params.get('token') && !params.get('accessToken') && window.location.pathname !== '/auth/callback') {
       window.history.replaceState({ page: 'home', itemData: null }, '', window.location.pathname);
     }
 
@@ -69,16 +74,35 @@ const App = () => {
   // 로그인 성공 콜백 핸들러
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
-    window.history.replaceState({ page: 'home', itemData: null }, document.title, window.location.pathname);
+    window.history.replaceState({ page: 'home', itemData: null }, document.title, '/');
     handleNavigate('home');
   };
 
-  // 로그아웃 처리 핸들러
-  const handleLogout = () => {
-    localStorage.removeItem('accessToken');
-    setIsLoggedIn(false);
-    alert('로그아웃 되었습니다.');
-    handleNavigate('home');
+  // 로그아웃 처리 핸들러 (API 호출 및 프론트엔드 상태 초기화 통합)
+  const handleLogout = async () => {
+    const accessToken = localStorage.getItem('accessToken');
+
+    try {
+      if (accessToken) {
+        await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('로그아웃 API 호출 실패:', error);
+    } finally {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      localStorage.removeItem('userId');
+
+      setIsLoggedIn(false);
+      alert('로그아웃 되었습니다.');
+      handleNavigate('home');
+    }
   };
 
   // 현재 상태에 따른 페이지 컴포넌트 렌더링
@@ -89,7 +113,8 @@ const App = () => {
       case 'report-lost': return <ReportForm setCurrentPage={handleNavigate} initialType="lost" />;
       case 'report-found': return <ReportForm setCurrentPage={handleNavigate} initialType="found" />;
       case 'login': return <Login setIsLoggedIn={setIsLoggedIn} setCurrentPage={handleNavigate} />;
-      case 'oauth-callback': return <OAuthCallback onLoginSuccess={handleLoginSuccess} />;
+      case 'oauth-callback':
+      case 'auth-callback': return <OAuthCallback onLoginSuccess={handleLoginSuccess} setIsLoggedIn={setIsLoggedIn} setCurrentPage={handleNavigate} />;
       case 'mypage': return <MyPage onNavigate={handleNavigate} />;
       case 'lost-list': return <ItemList mode="lost" onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />;
       case 'found-list': return <ItemList mode="found" onNavigate={handleNavigate} isLoggedIn={isLoggedIn} />;

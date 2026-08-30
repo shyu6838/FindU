@@ -5,7 +5,7 @@ export default function Login() {
   
   // 백엔드 구글 인증 진입점으로 리다이렉트
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/oauth2/authorization/google`;
   };
 
   return (
@@ -38,6 +38,7 @@ const styles = {
     minHeight: '60vh',
     fontFamily: "'Pretendard', sans-serif"
   },
+  
   box: {
     width: '100%',
     maxWidth: '400px',
@@ -52,13 +53,14 @@ const styles = {
     gap: '28px',
     boxSizing: 'border-box'
   },
+  
   logo: {
     fontSize: '28px',
     fontWeight: 'bold',
     color: '#111827',
-    margin: 0,
-    letterSpacing: '-0.5px'
+    margin: 0
   },
+  
   subText: {
     margin: 0,
     textAlign: 'center',
@@ -66,6 +68,7 @@ const styles = {
     color: '#4b5563',
     fontSize: '15px'
   },
+  
   googleButton: {
     display: 'flex',
     alignItems: 'center',
@@ -79,10 +82,9 @@ const styles = {
     borderRadius: '10px',
     fontSize: '15px',
     fontWeight: 'bold',
-    cursor: 'pointer',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-    transition: 'background-color 0.2s, border-color 0.2s'
+    cursor: 'pointer'
   },
+  
   googleIcon: {
     fontSize: '18px',
     fontWeight: '900',
