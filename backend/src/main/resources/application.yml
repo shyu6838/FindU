@@ -31,27 +31,14 @@ spring:
             scope:
               - email
               - profile
-
-  # 구글 로그인 설정
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: "ClientId"
-
-            client-secret: "ClientSecret"
-            scope:
-              - email
-              - profile
         provider:
           google:
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth?prompt=select_account
 
 # JWT 설정
 jwt:
-  secret: "findu_secret_key_findu_secret_key_findu_secret_key_12345"
-  access-token-expiration: 3600000
+  secret: ${JWT_SECRET}
+  access-token-expiration: 1800000
   refresh-token-expiration: 1209600000
 
 server:
@@ -60,12 +47,6 @@ server:
 app:
   frontend-url: http://localhost:5173
 
-
-jwt:
-  secret: ${JWT_SECRET}
-  access-token-expiration: 1800000
-  refresh-token-expiration: 1209600000
-
 aws:
   s3:
     bucket: ${AWS_S3_BUCKET}
@@ -73,10 +54,8 @@ aws:
     access-key: ${AWS_ACCESS_KEY}
     secret-key: ${AWS_SECRET_KEY}
 
-
 logging:
   level:
-
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
 
