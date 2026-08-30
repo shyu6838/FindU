@@ -1,0 +1,1 @@
+package findu.backend.report.repository; import findu.backend.report.entity.Report; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*; public interface ReportRepository extends JpaRepository<Report,Long>{List<Report> findByReporterIdOrderByCreatedAtDesc(Long id);List<Report> findAllByOrderByCreatedAtDesc();}
