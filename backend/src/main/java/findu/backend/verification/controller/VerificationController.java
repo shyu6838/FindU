@@ -16,8 +16,10 @@ public class VerificationController {
 
     private final VerificationService s;
 
-    // 습득물 등록자가 인증 질문 생성
-    @PostMapping("/found-items/{foundItemId}/verification-questions")
+    // 인증 질문 생성
+    @PostMapping(
+            "/found-items/{foundItemId}/verification-questions"
+    )
     public VerificationQuestionResponse create(
             @AuthenticationPrincipal Long uid,
             @PathVariable Long foundItemId,
@@ -27,20 +29,35 @@ public class VerificationController {
     }
 
     // 인증 질문 조회
-    @GetMapping("/found-items/{foundItemId}/verification-questions")
+    @GetMapping(
+            "/found-items/{foundItemId}/verification-questions"
+    )
     public List<VerificationQuestionResponse> list(
             @PathVariable Long foundItemId
     ) {
         return s.list(foundItemId);
     }
 
-    // 매칭된 분실물 사용자가 인증
-    @PostMapping("/verification-questions/{questionId}/verify")
+    // 인증 답변 제출
+    @PostMapping(
+            "/verification-questions/{questionId}/verify"
+    )
     public boolean verify(
             @AuthenticationPrincipal Long uid,
             @PathVariable Long questionId,
             @Valid @RequestBody VerificationAnswerRequest r
     ) {
         return s.verify(uid, questionId, r);
+    }
+
+    // 해당 습득물 인증 성공 여부 확인
+    @GetMapping(
+            "/found-items/{foundItemId}/verification"
+    )
+    public boolean verified(
+            @AuthenticationPrincipal Long uid,
+            @PathVariable Long foundItemId
+    ) {
+        return s.isVerified(uid, foundItemId);
     }
 }

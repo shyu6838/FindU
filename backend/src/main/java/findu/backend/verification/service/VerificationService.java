@@ -2,14 +2,14 @@ package findu.backend.verification.service;
 
 import findu.backend.founditem.entity.FoundItem;
 import findu.backend.founditem.repository.FoundItemRepository;
-import findu.backend.match.entity.ItemMatch;
-import findu.backend.match.repository.ItemMatchRepository;
+import findu.backend.user.entity.User;
+import findu.backend.user.repository.UserRepository;
 import findu.backend.verification.dto.*;
 import findu.backend.verification.entity.VerificationQuestion;
+import findu.backend.verification.entity.VerificationVerification;
 import findu.backend.verification.repository.VerificationQuestionRepository;
-
+import findu.backend.verification.repository.VerificationVerificationRepository;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +21,12 @@ import java.util.List;
 public class VerificationService {
 
     private final VerificationQuestionRepository repo;
+    private final VerificationVerificationRepository verificationRepo;
     private final FoundItemRepository found;
-    private final ItemMatchRepository itemMatchRepository;
+    private final UserRepository users;
     private final PasswordEncoder encoder;
 
-    /**
-     * 습득물 등록자가 인증 질문 생성
-     */
+    // 인증 질문 생성
     @Transactional
     public VerificationQuestionResponse create(
             Long uid,
@@ -40,7 +39,6 @@ public class VerificationService {
                         new IllegalArgumentException("습득물을 찾을 수 없습니다.")
                 );
 
-        // 습득물 등록자만 질문 생성 가능
         if (!f.getUser().getId().equals(uid)) {
             throw new IllegalStateException(
                     "본인의 습득물에만 질문을 등록할 수 있습니다."
@@ -59,11 +57,7 @@ public class VerificationService {
         );
     }
 
-    /**
-     * 특정 습득물의 인증 질문 조회
-     *
-     * 정답(answerHash)은 Response에 포함하지 않음
-     */
+    // 질문 조회
     @Transactional(readOnly = true)
     public List<VerificationQuestionResponse> list(Long foundId) {
 
@@ -73,45 +67,70 @@ public class VerificationService {
                 .toList();
     }
 
-    /**
-     * 인증 질문 답변
-     *
-     * 해당 습득물과 매칭된 분실물의 소유자만 인증 가능
-     */
-    @Transactional(readOnly = true)
+    // 답변 검증
+    @Transactional
     public boolean verify(
             Long uid,
             Long questionId,
             VerificationAnswerRequest r
     ) {
 
-        VerificationQuestion question = repo.findById(questionId)
+        VerificationQuestion question =
+                repo.findById(questionId)
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "인증 질문을 찾을 수 없습니다."
+                                )
+                        );
+
+        boolean correct =
+                encoder.matches(
+                        r.answer(),
+                        question.getAnswerHash()
+                );
+
+        // 오답
+        if (!correct) {
+            return false;
+        }
+
+        FoundItem foundItem = question.getFoundItem();
+
+        User user = users.findById(uid)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
-                                "인증 질문을 찾을 수 없습니다."
+                                "사용자를 찾을 수 없습니다."
                         )
                 );
 
-        Long foundItemId =
-                question.getFoundItem().getId();
+        // 이미 인증한 경우
+        if (!verificationRepo.existsByUserIdAndFoundItemId(
+                uid,
+                foundItem.getId()
+        )) {
 
-        // 현재 사용자가 해당 습득물과 매칭된 분실물의 주인인지 확인
-        boolean matchedOwner =
-                itemMatchRepository
-                        .existsByFoundItemIdAndLostItemUserId(
-                                foundItemId,
-                                uid
-                        );
+            VerificationVerification verification =
+                    VerificationVerification.builder()
+                            .user(user)
+                            .foundItem(foundItem)
+                            .build();
 
-        if (!matchedOwner) {
-            throw new IllegalStateException(
-                    "해당 습득물과 매칭된 분실물의 사용자만 인증할 수 있습니다."
-            );
+            verificationRepo.save(verification);
         }
 
-        return encoder.matches(
-                r.answer(),
-                question.getAnswerHash()
+        return true;
+    }
+
+    // 특정 사용자가 해당 습득물의 인증을 통과했는지 확인
+    @Transactional(readOnly = true)
+    public boolean isVerified(
+            Long uid,
+            Long foundItemId
+    ) {
+
+        return verificationRepo.existsByUserIdAndFoundItemId(
+                uid,
+                foundItemId
         );
     }
 }
