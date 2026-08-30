@@ -1,206 +1,62 @@
+// VerifyModal.jsx
+
 import React, { useState } from 'react';
 
-/**
- * 습득물 본인 확인 질문 답변 모달 컴포넌트
- * @param {boolean} isOpen - 모달 열림 여부
- * @param {function} onClose - 모달 닫기
- * @param {string} question - 습득자가 작성한 본인 확인 질문
- * @param {function} onSuccess - 답변 인증 성공 시 실행할 콜백 함수
- */
-export default function VerifyModal({ isOpen, onClose, question, onSuccess }) {
-  const [answer, setAnswer] = useState('');
+// 본인 확인(습득물 주인 검증) 팝업 모달 컴포넌트
+export default function VerifyModal({ isOpen, onClose, question, onVerify }) {
+  const [inputAnswer, setInputAnswer] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!answer.trim()) {
-      alert('답변을 입력해 주세요!');
+  // 정답 제출 핸들러
+  const handleSubmit = () => {
+    if (!inputAnswer.trim()) {
+      alert("정답을 입력해주세요.");
       return;
     }
-
-    // 💡 프론트엔드 목업 로직 (실제 서비스에서는 백엔드 API로 정답 검증)
-    alert('본인 확인 질문 답변이 제출되었습니다.\n인증이 완료되어 채팅하기 버튼이 활성화됩니다!');
-    onSuccess(); // 채팅하기 버튼 활성화 처리
-    setAnswer('');
-    onClose();
+    onVerify(inputAnswer);
   };
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        {/* 상단 헤더 */}
-        <div style={headerStyle}>
-          <h3 style={titleStyle}>본인 확인 질문</h3>
-          <button style={closeBtnStyle} onClick={onClose}>✕</button>
-        </div>
-
-        {/* 안내 문구 및 질문 박스 */}
-        <p style={subTextStyle}>
-          습득자가 물건의 실제 소유자인지 확인하기 위해 설정한 질문입니다. 정확히 답변해 주세요.
+    <div style={styles.overlay}>
+      <div style={styles.modal}>
+        <h3 style={styles.title}>본인 확인 진행</h3>
+        <p style={styles.desc}>
+          이 물건의 주인이 맞으신가요?<br/>
+          습득자가 남긴 아래 질문에 올바른 답변을 입력하시면 채팅이 활성화됩니다.
         </p>
         
-        <div style={questionBoxStyle}>
-          <span style={questionLabelStyle}> Q. 질문</span>
-          <p style={questionTextStyle}>
-            {question || '사전에 입력한 본인확인질문'}
-          </p>
+        <div style={styles.questionBox}>
+          <span style={styles.qLabel}>Q.</span> {question}
         </div>
 
-        {/* 답변 입력 폼 */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={labelStyle}>답변 작성</label>
-            <textarea
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder="답변을 상세히 입력해 주세요."
-              rows={4}
-              style={textareaStyle}
-            />
-          </div>
+        <input 
+          type="text" 
+          placeholder="정답을 입력하세요" 
+          value={inputAnswer}
+          onChange={(e) => setInputAnswer(e.target.value)}
+          style={styles.input}
+        />
 
-          {/* 하단 버튼 */}
-          <div style={buttonGroupStyle}>
-            <button type="button" onClick={onClose} style={cancelBtnStyle}>
-              취소
-            </button>
-            <button type="submit" style={submitBtnStyle}>
-              답변 제출하기
-            </button>
-          </div>
-        </form>
+        <div style={styles.buttonGroup}>
+          <button style={styles.cancelBtn} onClick={onClose}>취소</button>
+          <button style={styles.submitBtn} onClick={handleSubmit}>확인</button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ------------------- inline-CSS 스타일 ------------------- //
-
-const overlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1000,
-  backdropFilter: 'blur(3px)'
-};
-
-const modalStyle = {
-  backgroundColor: '#ffffff',
-  borderRadius: '16px',
-  padding: '24px',
-  width: '90%',
-  maxWidth: '460px',
-  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
-  boxSizing: 'border-box'
-};
-
-const headerStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '12px',
-  borderBottom: '1px solid #edf2f7',
-  paddingBottom: '12px'
-};
-
-const titleStyle = {
-  margin: 0,
-  fontSize: '18px',
-  fontWeight: 'bold',
-  color: '#111827'
-};
-
-const closeBtnStyle = {
-  background: 'none',
-  border: 'none',
-  fontSize: '18px',
-  cursor: 'pointer',
-  color: '#a0aec0'
-};
-
-const subTextStyle = {
-  fontSize: '13px',
-  color: '#6b7280',
-  marginTop: 0,
-  marginBottom: '16px',
-  lineHeight: '1.4'
-};
-
-const questionBoxStyle = {
-  backgroundColor: '#f3f4f6',
-  padding: '14px',
-  borderRadius: '10px',
-  marginBottom: '18px',
-  border: '1px solid #e5e7eb'
-};
-
-const questionLabelStyle = {
-  fontSize: '12px',
-  fontWeight: 'bold',
-  color: '#2563eb',
-  display: 'block',
-  marginBottom: '4px'
-};
-
-const questionTextStyle = {
-  fontSize: '14px',
-  fontWeight: '600',
-  color: '#1f2937',
-  margin: 0,
-  lineHeight: '1.4'
-};
-
-const labelStyle = {
-  display: 'block',
-  fontSize: '14px',
-  fontWeight: '600',
-  color: '#374151',
-  marginBottom: '8px'
-};
-
-const textareaStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '12px',
-  borderRadius: '8px',
-  border: '1px solid #d1d5db',
-  fontSize: '14px',
-  fontFamily: 'inherit',
-  resize: 'none',
-  outline: 'none'
-};
-
-const buttonGroupStyle = {
-  display: 'flex',
-  gap: '10px',
-  justifyContent: 'flex-end'
-};
-
-const cancelBtnStyle = {
-  padding: '10px 18px',
-  borderRadius: '8px',
-  border: '1px solid #cbd5e0',
-  backgroundColor: '#ffffff',
-  color: '#4b5568',
-  fontSize: '14px',
-  fontWeight: '600',
-  cursor: 'pointer'
-};
-
-const submitBtnStyle = {
-  padding: '10px 18px',
-  borderRadius: '8px',
-  border: 'none',
-  backgroundColor: '#2563eb',
-  color: '#ffffff',
-  fontSize: '14px',
-  fontWeight: '600',
-  cursor: 'pointer'
+// 스타일 설정
+const styles = {
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },
+  modal: { backgroundColor: '#fff', padding: '30px', borderRadius: '16px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' },
+  title: { margin: '0 0 10px 0', fontSize: '20px', color: '#111827' },
+  desc: { color: '#6b7280', fontSize: '14px', marginBottom: '20px', lineHeight: '1.5' },
+  questionBox: { backgroundColor: '#eff6ff', padding: '16px', borderRadius: '12px', color: '#1e3a8a', fontWeight: 'bold', marginBottom: '20px', fontSize: '15px' },
+  qLabel: { color: '#2563eb', marginRight: '6px' },
+  input: { width: '100%', padding: '14px', border: '1px solid #d1d5db', borderRadius: '10px', fontSize: '15px', marginBottom: '24px', boxSizing: 'border-box' },
+  buttonGroup: { display: 'flex', gap: '10px' },
+  cancelBtn: { flex: 1, padding: '12px', backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' },
+  submitBtn: { flex: 1, padding: '12px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }
 };

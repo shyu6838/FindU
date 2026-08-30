@@ -11,6 +11,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+// JWT 토큰 생성 및 검증을 담당하는 컴포넌트
 @Component
 public class JwtTokenProvider {
 
@@ -23,20 +24,15 @@ public class JwtTokenProvider {
             @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
             @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration
     ) {
-        this.secretKey = Keys.hmacShaKeyFor(
-                secret.getBytes(StandardCharsets.UTF_8)
-        );
-
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
+    // Access Token 발급
     public String createAccessToken(Long userId, String email) {
-
         Date now = new Date();
-
-        Date expiration =
-                new Date(now.getTime() + accessTokenExpiration);
+        Date expiration = new Date(now.getTime() + accessTokenExpiration);
 
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
@@ -47,12 +43,10 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    // Refresh Token 발급
     public String createRefreshToken(Long userId) {
-
         Date now = new Date();
-
-        Date expiration =
-                new Date(now.getTime() + refreshTokenExpiration);
+        Date expiration = new Date(now.getTime() + refreshTokenExpiration);
 
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
@@ -62,8 +56,8 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    // 토큰에서 사용자 ID 추출
     public Long getUserId(String token) {
-
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(secretKey)
                 .build()
@@ -73,21 +67,20 @@ public class JwtTokenProvider {
         return Long.valueOf(claims.getSubject());
     }
 
+    // 토큰 유효성 검증
     public boolean validateToken(String token) {
-
         try {
             Jwts.parserBuilder()
                     .setSigningKey(secretKey)
                     .build()
                     .parseClaimsJws(token);
-
             return true;
-
         } catch (Exception e) {
             return false;
         }
     }
 
+    // Refresh Token 만료 시간 조회
     public long getRefreshTokenExpiration() {
         return refreshTokenExpiration;
     }

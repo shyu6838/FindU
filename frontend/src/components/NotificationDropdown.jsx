@@ -1,19 +1,19 @@
+// NotificationDropdown.jsx
+
 import React, { useState, useEffect, useRef } from 'react';
 
-/**
- * 네비게이션바 알림 드롭다운 컴포넌트
- */
+// 네비게이션바 알림 드롭다운 컴포넌트
 export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // 💡 가짜 알림 데이터
+  // 임시 알림 데이터
   const notifications = [
     { id: 1, type: 'CHAT', message: '사나운 코끼리님이 채팅을 보냈습니다.', time: '10분 전', isRead: false },
     { id: 2, type: 'MATCH', message: '내 분실물과 유사한 습득물이 발견되었습니다.', time: '1시간 전', isRead: false },
   ];
 
-  // 💡 바깥 영역 클릭 시 닫히도록 처리
+  // 드롭다운 외부 영역 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -24,35 +24,30 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 안 읽은 알림 확인
   const hasUnread = notifications.some(noti => !noti.isRead);
 
-  // 💡 알림 버튼 클릭 시 실행되는 함수 (로그인 체크)
+  // 알림 토글 핸들러
   const handleToggle = () => {
     if (!isLoggedIn) {
       alert("로그인이 필요한 서비스입니다.");
-      onNavigate('login'); // 로그인 안 되어있으면 로그인 페이지로 이동
+      onNavigate('login');
       return;
     }
-    setIsOpen(!isOpen); // 로그인 되어있을 때만 드롭다운 열기
+    setIsOpen(!isOpen);
   };
 
   return (
     <div style={containerStyle} ref={dropdownRef}>
-      {/* 알림 토글 버튼 */}
       <div 
         style={navItemStyle} 
         onClick={handleToggle}
       >
         알림
-        {/* 로그인되어 있고 안 읽은 알림이 있을 때만 빨간 점 표시 */}
         {isLoggedIn && hasUnread && <span style={redDotStyle}></span>}
       </div>
 
-      {/* 알림 드롭다운 목록 */}
       {isOpen && (
         <div style={dropdownStyle}>
-          {/* 헤더 */}
           <div style={headerStyle}>
             <h4 style={headerTitleStyle}>알림</h4>
             <button style={readAllBtnStyle} onClick={() => alert('모두 읽음 처리되었습니다.')}>
@@ -60,7 +55,6 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
             </button>
           </div>
 
-          {/* 리스트 */}
           <ul style={listStyle}>
             {notifications.map((noti) => (
               <li 
@@ -91,7 +85,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   );
 }
 
-// ------------------- inline-CSS 스타일 ------------------- //
+// 스타일 설정
 const containerStyle = { position: 'relative', display: 'inline-block', marginLeft: '24px' };
 const navItemStyle = { cursor: 'pointer', fontWeight: '500', color: '#374151', fontSize: '15px', display: 'flex', alignItems: 'center', position: 'relative' };
 const redDotStyle = { position: 'absolute', top: '-2px', right: '-6px', width: '6px', height: '6px', backgroundColor: '#ef4444', borderRadius: '50%' };

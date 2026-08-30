@@ -1,19 +1,14 @@
 import React, { useState } from 'react';
 import ReportModal from '../components/ReportModal';
 
-/**
- * 게시글 연동 1:1 채팅방 컴포넌트
- * @param {function} changePage - 페이지 이동 함수
- * @param {object} postInfo - 상세페이지에서 전달받은 게시글 정보
- */
+// 게시글 연동 1:1 채팅방 컴포넌트
 function ChatRoom({ changePage, postInfo }) {
-  // 1. 신고하기 모달 열림/닫힘 상태
+  // 상태 관리
   const [isReportOpen, setIsReportOpen] = useState(false);
-
-  // 2. 채팅 메시지 입력값
   const [inputText, setInputText] = useState('');
+  const [messages, setMessages] = useState([]);
 
-  // 3. 연관된 게시글 정보 (전달받은 정보가 없을 경우 대비한 기본값)
+  // 연관 게시글 기본 정보 처리
   const currentPost = postInfo || {
     id: 1,
     title: '검은색 가죽 지갑',
@@ -23,7 +18,7 @@ function ChatRoom({ changePage, postInfo }) {
     date: '2026-07-24'
   };
 
-  // 4. 랜덤 닉네임 생성 (예: 사나운 코끼리, 용감한 다람쥐 등)
+  // 임시 상대방 닉네임 생성
   const [partnerName] = useState(() => {
     const adjectives = ['사나운', '친절한', '용감한', '즐거운', '느긋한', '귀여운', '엉뚱한'];
     const animals = ['코끼리', '다람쥐', '호랑이', '사자', '펭귄', '여우', '곰'];
@@ -32,10 +27,7 @@ function ChatRoom({ changePage, postInfo }) {
     return `${randomAdj} ${randomAni}`;
   });
 
-  // 5. 대화 내역 (더미 데이터 삭제 -> 빈 배열로 시작)
-  const [messages, setMessages] = useState([]);
-
-  // 메시지 전송 버튼 클릭/엔터 시 처리
+  // 메시지 전송 처리
   const handleSend = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -53,7 +45,7 @@ function ChatRoom({ changePage, postInfo }) {
 
   return (
     <div style={containerStyle}>
-      {/* ------------------- A. 상단 헤더 (상대 정보 + 신고 버튼) ------------------- */}
+      {/* 상단 헤더 */}
       <div style={headerStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button 
@@ -73,13 +65,12 @@ function ChatRoom({ changePage, postInfo }) {
           </div>
         </div>
 
-        {/* 채팅 신고 버튼 (모달 호출) */}
         <button style={reportButtonStyle} onClick={() => setIsReportOpen(true)}>
           🚨 채팅 신고
         </button>
       </div>
 
-      {/* ------------------- B. 연관 게시글 요약 바 ------------------- */}
+      {/* 연관 게시글 요약 */}
       <div style={postBannerStyle}>
         <div style={postImageThumbnailStyle}>📦</div>
         <div style={{ flex: 1, marginLeft: '12px' }}>
@@ -93,7 +84,6 @@ function ChatRoom({ changePage, postInfo }) {
             {currentPost.title}
           </div>
         </div>
-        {/* 💡 글 보기 클릭 시 해당 게시글 상세 페이지('detail')로 데이터와 함께 이동 */}
         <button 
           style={viewPostButtonStyle}
           onClick={() => changePage && changePage('detail', currentPost)}
@@ -102,7 +92,7 @@ function ChatRoom({ changePage, postInfo }) {
         </button>
       </div>
 
-      {/* ------------------- C. 채팅 메시지 대화창 ------------------- */}
+      {/* 채팅 메시지 영역 */}
       <div style={chatBodyStyle}>
         {messages.length === 0 ? (
           <div style={emptyChatStyle}>
@@ -129,7 +119,6 @@ function ChatRoom({ changePage, postInfo }) {
                     flexDirection: isMe ? 'row-reverse' : 'row'
                   }}
                 >
-                  {/* 말풍선 */}
                   <div
                     style={{
                       padding: '10px 14px',
@@ -148,7 +137,6 @@ function ChatRoom({ changePage, postInfo }) {
                   >
                     {msg.text}
                   </div>
-                  {/* 전송 시간 */}
                   <span style={{ fontSize: '11px', color: '#a0aec0', marginBottom: '2px' }}>
                     {msg.time}
                   </span>
@@ -159,7 +147,7 @@ function ChatRoom({ changePage, postInfo }) {
         )}
       </div>
 
-      {/* ------------------- D. 하단 메시지 입력창 ------------------- */}
+      {/* 메시지 입력 영역 */}
       <form onSubmit={handleSend} style={inputContainerStyle}>
         <input
           type="text"
@@ -173,7 +161,7 @@ function ChatRoom({ changePage, postInfo }) {
         </button>
       </form>
 
-      {/* ------------------- E. 채팅 신고 모달 연동 ------------------- */}
+      {/* 신고 모달 */}
       <ReportModal
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
@@ -184,8 +172,7 @@ function ChatRoom({ changePage, postInfo }) {
   );
 }
 
-// ------------------- inline-CSS 스타일 정의 ------------------- //
-
+// 스타일 설정
 const containerStyle = {
   maxWidth: '600px',
   margin: '20px auto',
@@ -292,7 +279,6 @@ const inputContainerStyle = {
   borderTop: '1px solid #edf2f7'
 };
 
-// 💡 입력 글자색(color)을 어두운 톤으로 고정하여 하얗게 보이지 않도록 수정
 const inputStyle = {
   flex: 1,
   padding: '12px 16px',
