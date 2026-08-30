@@ -1,0 +1,1 @@
+package findu.backend.founditem.repository; import findu.backend.founditem.entity.FoundItem; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*; public interface FoundItemRepository extends JpaRepository<FoundItem,Long>{List<FoundItem> findAllByOrderByCreatedAtDesc();}

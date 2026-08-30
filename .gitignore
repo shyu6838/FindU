@@ -1,5 +1,5 @@
 .idea/
 .vscode/
-.env
+backend/.env
 .DS_Store
 *.log
