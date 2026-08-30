@@ -11,4 +11,9 @@ public interface ItemMatchRepository
     List<ItemMatch> findByLostItemIdOrderByFinalScoreDesc(Long lostItemId);
 
     List<ItemMatch> findByFoundItemIdOrderByFinalScoreDesc(Long foundItemId);
+
+    boolean existsByFoundItemIdAndLostItemUserId(
+            Long foundItemId,
+            Long userId
+    );
 }
