@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
+import api from '../api/axios';
 
 // 카테고리 목록
 const CATEGORIES = [
@@ -40,7 +40,7 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
     setLoading(true);
     const itemType = mode.toUpperCase();
     
-    axios.get(`http://localhost:8080/api/items?type=${itemType}`)
+    api.get(`/api/items?type=${itemType}`)
       .then(res => {
         setItems(res.data || []);
         setLoading(false);

@@ -62,11 +62,12 @@ public class Item extends BaseEntity {
     }
 
     // 게시물 정보 수정
-    public void update(String title, String content, String location, LocalDateTime eventDate, String question, String answer, Category category) {
+    public void update(String title, String content, String location, LocalDateTime eventDate, String imageUrl, String question, String answer, Category category) {
         this.title = title;
         this.content = content;
         this.location = location;
         this.eventDate = eventDate;
+        this.imageUrl = imageUrl;
         this.question = question;
         this.answer = answer;
         this.category = category;

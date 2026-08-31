@@ -92,6 +92,7 @@ public class ItemService {
                 requestDto.getContent(),
                 requestDto.getLocation(),
                 requestDto.getEventDate(),
+                requestDto.getImageUrl(),
                 requestDto.getQuestion(),
                 requestDto.getAnswer(),
                 category
@@ -115,5 +116,16 @@ public class ItemService {
                 .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
         
         item.updateStatus(status); 
+    }
+
+    public boolean verifyItemAnswer(Long id, String answer) {
+        Item item = itemRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
+
+        if (item.getAnswer() == null || answer == null) {
+            return false;
+        }
+
+        return item.getAnswer().trim().equalsIgnoreCase(answer.trim());
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 import Home from './pages/Home';
 import ReportForm from './pages/ReportForm';
@@ -9,6 +9,7 @@ import ItemList from './pages/ItemList';
 import PostDetail from './pages/PostDetail';
 import ChatRoom from './pages/ChatRoom';
 import NotificationDropdown from './components/NotificationDropdown';
+import api from './api/axios';
 
 // 최상위 라우팅 및 상태 관리 컴포넌트
 const App = () => {
@@ -80,16 +81,9 @@ const App = () => {
 
   // 로그아웃 처리 핸들러 (API 호출 및 프론트엔드 상태 초기화 통합)
   const handleLogout = async () => {
-    const accessToken = localStorage.getItem('accessToken');
-
     try {
-      if (accessToken) {
-        await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
+      if (localStorage.getItem('accessToken')) {
+        await api.post('/api/auth/logout');
       }
     } catch (error) {
       console.error('로그아웃 API 호출 실패:', error);

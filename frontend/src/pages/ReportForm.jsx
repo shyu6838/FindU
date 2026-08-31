@@ -1,7 +1,7 @@
 // ReportForm.jsx
 
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect } from 'react';
+import api from '../api/axios';
 
 // 기본 카테고리 목록 설정
 const DEFAULT_CATEGORIES = [
@@ -55,7 +55,7 @@ export default function ReportForm({ setCurrentPage, initialType = 'lost', editD
       setReportType(initialType);
     }
 
-    axios.get('http://localhost:8080/api/categories')
+    api.get('/api/categories')
       .then(res => {
         if (res.data && res.data.length > 0) {
           setCategories(res.data);
@@ -98,25 +98,32 @@ export default function ReportForm({ setCurrentPage, initialType = 'lost', editD
       content: formData.content,
       location: formData.location,
       eventDate: dateTime,
+      imageUrl: editData?.imageUrl || null,
       question: reportType === 'found' ? formData.question : null,
       answer: reportType === 'found' ? formData.answer : null,
       categoryId: parseInt(formData.categoryId)
     };
 
     try {
-      const token = localStorage.getItem('accessToken'); 
-      const headers = { Authorization: `Bearer ${token}` };
+      if (formData.image) {
+        const imageFormData = new FormData();
+        imageFormData.append('file', formData.image);
+        const imageRes = await api.post('/api/images', imageFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        requestData.imageUrl = imageRes.data?.imageUrl || requestData.imageUrl;
+      }
       
       if (isEditMode) {
-        await axios.put(`http://localhost:8080/api/items/${editData.id}`, requestData, { headers });
+        await api.put(`/api/items/${editData.id}`, requestData);
         alert('게시물이 수정되었습니다.');
         setCurrentPage('post-detail', editData.id);
       } else {
-        await axios.post('http://localhost:8080/api/items', requestData, { headers });
+        await api.post('/api/items', requestData);
         alert('게시물이 성공적으로 등록되었습니다.');
         setCurrentPage(reportType === 'lost' ? 'lost-list' : 'found-list'); 
       }
-    } catch (error) {
+    } catch {
       alert(isEditMode ? '게시물 수정에 실패했습니다.' : '게시물 등록에 실패했습니다.');
     }
   };

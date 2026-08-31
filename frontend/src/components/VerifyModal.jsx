@@ -1,6 +1,6 @@
 // VerifyModal.jsx
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 // 본인 확인(습득물 주인 검증) 팝업 모달 컴포넌트
 export default function VerifyModal({ isOpen, onClose, question, onVerify }) {

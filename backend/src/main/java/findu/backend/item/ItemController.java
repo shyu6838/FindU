@@ -2,6 +2,7 @@
 
 package findu.backend.item;
 
+import findu.backend.verification.dto.VerificationAnswerRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -68,5 +69,12 @@ public class ItemController {
     public ResponseEntity<Void> updateItemStatus(@PathVariable Long id, @RequestParam String status) {
         itemService.updateItemStatus(id, ItemStatus.valueOf(status));
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/verify")
+    public ResponseEntity<Boolean> verifyItemAnswer(
+            @PathVariable Long id,
+            @RequestBody VerificationAnswerRequest request) {
+        return ResponseEntity.ok(itemService.verifyItemAnswer(id, request.answer()));
     }
 }

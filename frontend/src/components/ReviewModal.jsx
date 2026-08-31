@@ -1,16 +1,39 @@
 // ReviewModal.jsx
 
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
+import api from '../api/axios';
 
-// 임시 채팅 상대 데이터
-const MOCK_CHAT_USERS = [
-  { id: 1, nickname: '부경대다람쥐', email: 'squirrel@pknu.ac.kr' },
-  { id: 2, nickname: '지갑찾아삼만리', email: 'wallet@pknu.ac.kr' }
-];
-
-export default function ReviewModal({ isOpen, onClose, onResolve }) {
+export default function ReviewModal({ isOpen, onClose, onResolve, currentUserId }) {
+  const [chatUsers, setChatUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !currentUserId) return;
+
+    api.get('/api/chat-rooms')
+      .then(res => {
+        const users = (res.data || []).map(room => {
+          const isUser1 = room.user1Id === currentUserId;
+          return {
+            id: isUser1 ? room.user2Id : room.user1Id,
+            nickname: isUser1 ? room.user2Nickname : room.user1Nickname,
+          };
+        });
+
+        const uniqueUsers = users.filter((user, index, arr) =>
+          user.id && arr.findIndex(item => item.id === user.id) === index
+        );
+
+        setChatUsers(uniqueUsers);
+        setSelectedUser(uniqueUsers[0] || null);
+      })
+      .catch(() => {
+        setChatUsers([]);
+        setSelectedUser(null);
+      });
+  }, [isOpen, currentUserId]);
 
   if (!isOpen) return null;
 
@@ -22,14 +45,26 @@ export default function ReviewModal({ isOpen, onClose, onResolve }) {
     }
   };
 
-  const handleSubmit = () => {
-    if (!selectedUser) return alert("물건을 전달받은/전달한 채팅 상대를 선택해주세요.");
+  const handleSubmit = async () => {
+    if (!selectedUser?.id) return alert("후기를 남길 사용자를 확인할 수 없습니다.");
     if (selectedTags.length === 0) return alert("최소 1개 이상의 후기를 선택해주세요.");
 
-    // 리뷰 데이터 전송 및 상태 업데이트 처리
-    alert(`${selectedUser.nickname}님에게 후기가 전달되었습니다. 게시글이 완료 처리됩니다!`);
-    onResolve();
-    onClose();
+    try {
+      setSubmitting(true);
+      await api.post('/api/reviews', {
+        revieweeId: selectedUser.id,
+        rating: 5,
+        comment: selectedTags.join(', '),
+      });
+      await onResolve();
+      alert(`${selectedUser.nickname || '상대방'}님에게 후기가 전달되었습니다. 게시글이 완료 처리됩니다!`);
+      setSelectedTags([]);
+      onClose();
+    } catch {
+      alert('후기 등록 또는 완료 처리에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -43,9 +78,11 @@ export default function ReviewModal({ isOpen, onClose, onResolve }) {
         <div style={styles.section}>
           <h4 style={styles.sectionTitle}>후기를 남길 사용자를 선택하세요.</h4>
           <div style={styles.userList}>
-            {MOCK_CHAT_USERS.map(user => (
-              <div 
-                key={user.id} 
+            {chatUsers.length === 0 ? (
+              <div style={{ color: '#9ca3af', fontSize: '14px' }}>후기를 남길 채팅 상대가 없습니다.</div>
+            ) : chatUsers.map(user => (
+              <div
+                key={user.id}
                 style={{
                   ...styles.userCard,
                   borderColor: selectedUser?.id === user.id ? '#2563eb' : '#e5e7eb',
@@ -55,8 +92,8 @@ export default function ReviewModal({ isOpen, onClose, onResolve }) {
               >
                 <div style={styles.userAvatar}>👤</div>
                 <div>
-                  <div style={styles.userNickname}>{user.nickname}</div>
-                  <div style={styles.userEmail}>{user.email}</div>
+                  <div style={styles.userNickname}>{user.nickname || '상대방'}</div>
+                  <div style={styles.userEmail}>사용자 #{user.id}</div>
                 </div>
               </div>
             ))}
@@ -83,8 +120,8 @@ export default function ReviewModal({ isOpen, onClose, onResolve }) {
           </div>
         </div>
 
-        <button style={styles.submitBtn} onClick={handleSubmit}>
-          후기 보내고 완료 처리하기
+        <button style={styles.submitBtn} onClick={handleSubmit} disabled={submitting}>
+          {submitting ? '처리 중...' : '후기 보내고 완료 처리하기'}
         </button>
       </div>
     </div>

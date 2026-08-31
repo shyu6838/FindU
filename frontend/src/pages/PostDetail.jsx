@@ -1,6 +1,6 @@
 // PostDetail.jsx
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ReportModal from '../components/ReportModal';
 import VerifyModal from '../components/VerifyModal'; 
@@ -16,6 +16,7 @@ export default function PostDetail({ itemId, onNavigate }) {
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
   const [isSimilarModalOpen, setIsSimilarModalOpen] = useState(false); 
   const [isReviewOpen, setIsReviewOpen] = useState(false); 
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     if (!itemId) return;
@@ -26,7 +27,10 @@ export default function PostDetail({ itemId, onNavigate }) {
     const token = localStorage.getItem('accessToken');
     if (token) {
       api.get('/api/users/me')
-        .then(res => setCurrentUserEmail(res.data.email))
+        .then(res => {
+          setCurrentUser(res.data);
+          setCurrentUserEmail(res.data.email);
+        })
         .catch(() => {});
     }
 
@@ -47,7 +51,8 @@ export default function PostDetail({ itemId, onNavigate }) {
   const typeLabel = isLost ? '분실' : '습득';
   const typeBgColor = isLost ? '#ef4444' : '#10b981';
   
-  const isMyPost = currentUserEmail && currentUserEmail === postData.writerEmail;
+  const isMyPost = (currentUser?.id && currentUser.id === postData.writerId) ||
+    (currentUserEmail && currentUserEmail === postData.writerEmail);
 
   // 로그인 상태 확인
   const checkLogin = () => {
@@ -65,7 +70,7 @@ export default function PostDetail({ itemId, onNavigate }) {
       await api.delete(`/api/items/${itemId}`);
       alert("게시글이 삭제되었습니다.");
       onNavigate(isLost ? 'lost-list' : 'found-list');
-    } catch (error) {
+    } catch {
       alert("삭제 권한이 없거나 오류가 발생했습니다.");
     }
   };
@@ -78,7 +83,7 @@ export default function PostDetail({ itemId, onNavigate }) {
     try {
       await api.patch(`/api/items/${itemId}/status?status=RESOLVED`);
       setPostData(prev => ({ ...prev, status: 'RESOLVED' }));
-    } catch (error) {
+    } catch {
       alert("완료 처리에 실패했습니다.");
     }
   };
@@ -90,30 +95,42 @@ export default function PostDetail({ itemId, onNavigate }) {
       await api.patch(`/api/items/${itemId}/status?status=SEARCHING`);
       setPostData(prev => ({ ...prev, status: 'SEARCHING' }));
       alert("완료 처리가 취소되었습니다.");
-    } catch (error) {
+    } catch {
       alert("상태 변경에 실패했습니다.");
     }
   };
 
   // 본인 확인 인증 처리
-  const handleVerifySubmit = (inputAnswer) => {
-    if (!postData.answer) return alert("등록된 정답 정보가 없습니다.");
-    if (inputAnswer.trim().toLowerCase() === postData.answer.trim().toLowerCase()) {
+  const handleVerifySubmit = async (inputAnswer) => {
+    try {
+      const res = await api.post(`/api/items/${itemId}/verify`, { answer: inputAnswer });
+      if (!res.data) {
+        alert("정답이 일치하지 않습니다. 다시 시도해주세요.");
+        return;
+      }
+
       alert("본인 확인에 성공했습니다. 이제 작성자와 채팅을 나눌 수 있습니다.");
       setIsVerified(true);
       localStorage.setItem(`verified_item_${itemId}`, 'true');
       setIsVerifyOpen(false);
-    } else {
-      alert("정답이 일치하지 않습니다. 다시 시도해주세요.");
+    } catch {
+      alert("본인 확인 처리에 실패했습니다.");
     }
   };
 
   // 채팅방 진입 핸들러
-  const handleChatClick = () => {
+  const handleChatClick = async () => {
     if (!checkLogin()) return; 
     if (isMyPost) return; 
     if (!isLost && !isVerified) return alert("습득물은 먼저 본인 확인을 완료해야 채팅을 시작할 수 있습니다.");
-    onNavigate('chat-room', postData);
+    if (!postData.writerId) return alert("작성자 정보를 확인할 수 없어 채팅을 시작할 수 없습니다.");
+
+    try {
+      const roomRes = await api.post('/api/chat-rooms', { userId: postData.writerId });
+      onNavigate('chat-room', { post: postData, room: roomRes.data });
+    } catch {
+      alert("채팅방 생성에 실패했습니다.");
+    }
   };
 
   return (
@@ -232,7 +249,7 @@ export default function PostDetail({ itemId, onNavigate }) {
         </div>
       </div>
 
-      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetType="게시글" targetTitle={postData.title} />
+      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetType="ITEM" targetTitle={postData.title} targetId={postData.id} />
       
       {isVerifyOpen && (
         <VerifyModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} question={postData.question || '본인 확인 질문이 등록되지 않았습니다.'} onVerify={handleVerifySubmit} />
@@ -250,6 +267,7 @@ export default function PostDetail({ itemId, onNavigate }) {
         isOpen={isReviewOpen} 
         onClose={() => setIsReviewOpen(false)} 
         onResolve={handleResolve}
+        currentUserId={currentUser?.id}
       />
     </div>
   );

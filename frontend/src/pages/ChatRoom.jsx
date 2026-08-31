@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReportModal from '../components/ReportModal';
+import api from '../api/axios';
 
 // 게시글 연동 1:1 채팅방 컴포넌트
 function ChatRoom({ changePage, postInfo }) {
@@ -7,40 +8,69 @@ function ChatRoom({ changePage, postInfo }) {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState([]);
+  const incomingRoom = postInfo?.room || (postInfo?.user1Id ? postInfo : null);
+  const [room, setRoom] = useState(incomingRoom);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // 연관 게시글 기본 정보 처리
-  const currentPost = postInfo || {
-    id: 1,
-    title: '검은색 가죽 지갑',
-    type: 'LOST',
-    category: '지갑',
-    location: '인문관 3층 복도',
-    date: '2026-07-24'
-  };
+  const currentPost = postInfo?.post || (postInfo?.title ? postInfo : null);
 
-  // 임시 상대방 닉네임 생성
-  const [partnerName] = useState(() => {
-    const adjectives = ['사나운', '친절한', '용감한', '즐거운', '느긋한', '귀여운', '엉뚱한'];
-    const animals = ['코끼리', '다람쥐', '호랑이', '사자', '펭귄', '여우', '곰'];
-    const randomAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const randomAni = animals[Math.floor(Math.random() * animals.length)];
-    return `${randomAdj} ${randomAni}`;
-  });
+  useEffect(() => {
+    let ignore = false;
 
-  // 메시지 전송 처리
-  const handleSend = (e) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
+    const loadChat = async () => {
+      try {
+        setLoading(true);
+        const userRes = await api.get('/api/users/me');
+        if (ignore) return;
+        setCurrentUser(userRes.data);
 
-    const newMsg = {
-      id: Date.now(),
-      sender: 'me',
-      text: inputText,
-      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        let activeRoom = incomingRoom;
+        if (!activeRoom && currentPost?.writerId) {
+          const roomRes = await api.post('/api/chat-rooms', { userId: currentPost.writerId });
+          activeRoom = roomRes.data;
+        }
+
+        if (!ignore) setRoom(activeRoom || null);
+
+        if (activeRoom?.id) {
+          const messagesRes = await api.get(`/api/chat-rooms/${activeRoom.id}/messages`);
+          if (!ignore) setMessages(messagesRes.data || []);
+        } else if (!ignore) {
+          setMessages([]);
+        }
+      } catch {
+        alert('채팅 정보를 불러오지 못했습니다.');
+      } finally {
+        if (!ignore) setLoading(false);
+      }
     };
 
-    setMessages((prev) => [...prev, newMsg]);
-    setInputText('');
+    loadChat();
+
+    return () => {
+      ignore = true;
+    };
+  }, [currentPost?.writerId, incomingRoom]);
+
+  const partnerName = room && currentUser
+    ? (room.user1Id === currentUser.id ? room.user2Nickname : room.user1Nickname)
+    : '상대방';
+
+  // 메시지 전송 처리
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
+    if (!room?.id) return alert('채팅방을 확인할 수 없습니다.');
+
+    try {
+      const res = await api.post(`/api/chat-rooms/${room.id}/messages`, { content: inputText });
+      setMessages((prev) => [...prev, res.data]);
+      setInputText('');
+    } catch {
+      alert('메시지 전송에 실패했습니다.');
+    }
   };
 
   return (
@@ -50,7 +80,7 @@ function ChatRoom({ changePage, postInfo }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button 
             style={backButtonStyle} 
-            onClick={() => changePage && changePage('detail', currentPost)}
+            onClick={() => currentPost?.id ? changePage && changePage('detail', currentPost) : changePage && changePage('mypage')}
             title="게시글로 돌아가기"
           >
             ←
@@ -60,7 +90,7 @@ function ChatRoom({ changePage, postInfo }) {
               {partnerName}
             </h3>
             <span style={{ fontSize: '12px', color: '#38a169', fontWeight: '500' }}>
-              ● 온라인
+              {loading ? '불러오는 중' : '대화 가능'}
             </span>
           </div>
         </div>
@@ -72,24 +102,28 @@ function ChatRoom({ changePage, postInfo }) {
 
       {/* 연관 게시글 요약 */}
       <div style={postBannerStyle}>
-        <div style={postImageThumbnailStyle}>📦</div>
+        <div style={postImageThumbnailStyle}>
+          {currentPost?.imageUrl ? <img src={currentPost.imageUrl} alt="게시글 사진" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} /> : '📦'}
+        </div>
         <div style={{ flex: 1, marginLeft: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={typeBadgeStyle}>
-              {currentPost.type === 'LOST' ? '분실' : '습득'}
+              {currentPost?.type === 'LOST' ? '분실' : currentPost?.type === 'FOUND' ? '습득' : '채팅'}
             </span>
-            <span style={{ fontSize: '12px', color: '#718096' }}>{currentPost.location}</span>
+            <span style={{ fontSize: '12px', color: '#718096' }}>{currentPost?.location || '연결된 게시글 없음'}</span>
           </div>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#2d3748', marginTop: '3px' }}>
-            {currentPost.title}
+            {currentPost?.title || '채팅방'}
           </div>
         </div>
-        <button 
-          style={viewPostButtonStyle}
-          onClick={() => changePage && changePage('detail', currentPost)}
-        >
-          글 보기
-        </button>
+        {currentPost?.id && (
+          <button 
+            style={viewPostButtonStyle}
+            onClick={() => changePage && changePage('detail', currentPost)}
+          >
+            글 보기
+          </button>
+        )}
       </div>
 
       {/* 채팅 메시지 영역 */}
@@ -100,7 +134,7 @@ function ChatRoom({ changePage, postInfo }) {
           </div>
         ) : (
           messages.map((msg) => {
-            const isMe = msg.sender === 'me';
+            const isMe = msg.senderId === currentUser?.id;
             return (
               <div
                 key={msg.id}
@@ -135,10 +169,10 @@ function ChatRoom({ changePage, postInfo }) {
                       border: isMe ? 'none' : '1px solid #e2e8f0'
                     }}
                   >
-                    {msg.text}
+                    {msg.content || msg.text}
                   </div>
                   <span style={{ fontSize: '11px', color: '#a0aec0', marginBottom: '2px' }}>
-                    {msg.time}
+                    {msg.createdAt ? msg.createdAt.replace('T', ' ').slice(11, 16) : ''}
                   </span>
                 </div>
               </div>
@@ -165,7 +199,8 @@ function ChatRoom({ changePage, postInfo }) {
       <ReportModal
         isOpen={isReportOpen}
         onClose={() => setIsReportOpen(false)}
-        targetType="채팅"
+        targetType="CHAT"
+        targetId={room?.id}
         targetTitle={`${partnerName}님과의 대화`}
       />
     </div>
