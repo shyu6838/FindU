@@ -14,7 +14,9 @@ function ChatRoom({ changePage, postInfo }) {
   const [loading, setLoading] = useState(true);
 
   // 연관 게시글 기본 정보 처리
-  const currentPost = postInfo?.post || (postInfo?.title ? postInfo : null);
+  const initialPost = postInfo?.post || (postInfo?.title ? postInfo : null);
+  const [connectedPost, setConnectedPost] = useState(initialPost);
+  const currentPost = connectedPost;
 
   useEffect(() => {
     let ignore = false;
@@ -27,17 +29,33 @@ function ChatRoom({ changePage, postInfo }) {
         setCurrentUser(userRes.data);
 
         let activeRoom = incomingRoom;
-        if (!activeRoom && currentPost?.writerId) {
-          const roomRes = await api.post('/api/chat-rooms', { userId: currentPost.writerId });
+        if (!activeRoom && initialPost?.writerId) {
+          const roomRes = await api.post('/api/chat-rooms', {
+            userId: initialPost.writerId,
+            itemId: initialPost.id,
+          });
           activeRoom = roomRes.data;
         }
 
-        if (!ignore) setRoom(activeRoom || null);
-
         if (activeRoom?.id) {
+          const roomRes = await api.get(`/api/chat-rooms/${activeRoom.id}`);
+          activeRoom = roomRes.data;
           const messagesRes = await api.get(`/api/chat-rooms/${activeRoom.id}/messages`);
-          if (!ignore) setMessages(messagesRes.data || []);
+
+          let item = initialPost;
+          if (activeRoom.itemId) {
+            const itemRes = await api.get(`/api/items/${activeRoom.itemId}`);
+            item = itemRes.data;
+          }
+
+          if (!ignore) {
+            setRoom(activeRoom);
+            setConnectedPost(item || null);
+            setMessages(messagesRes.data || []);
+          }
         } else if (!ignore) {
+          setRoom(null);
+          setConnectedPost(initialPost || null);
           setMessages([]);
         }
       } catch {
@@ -52,7 +70,7 @@ function ChatRoom({ changePage, postInfo }) {
     return () => {
       ignore = true;
     };
-  }, [currentPost?.writerId, incomingRoom]);
+  }, [incomingRoom, initialPost]);
 
   const partnerName = room && currentUser
     ? (room.user1Id === currentUser.id ? room.user2Nickname : room.user1Nickname)

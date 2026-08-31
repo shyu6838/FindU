@@ -114,7 +114,7 @@ const MyPage = ({ onNavigate }) => {
               <li style={{ ...styles.listItem, cursor: 'default', color: '#9ca3af' }}>참여 중인 채팅방이 없습니다.</li>
             ) : chatRooms.map((room) => (
               <li key={room.id} style={styles.listItem} onClick={() => onNavigate && onNavigate('chat-room', room)}>
-                <strong>{getPartnerName(room)}</strong>님과의 대화
+                <strong>{getPartnerName(room)}</strong>님과의 대화{room.itemTitle ? ` · ${room.itemTitle}` : ''}
               </li>
             ))}
           </ul>

@@ -22,4 +22,16 @@ public interface ChatRoomRepository extends JpaRepository<ChatRoom, Long> {
             Long user2Id,
             Long user1Id
     );
+
+    Optional<ChatRoom> findByItemIdAndUser1IdAndUser2Id(
+            Long itemId,
+            Long user1Id,
+            Long user2Id
+    );
+
+    Optional<ChatRoom> findByItemIdAndUser2IdAndUser1Id(
+            Long itemId,
+            Long user2Id,
+            Long user1Id
+    );
 }

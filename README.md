@@ -100,6 +100,8 @@ Python AI Module
 
 ```text
 FindU
+├── AI
+│   └── Python
 ├── backend
 │   └── Spring Boot
 ├── frontend

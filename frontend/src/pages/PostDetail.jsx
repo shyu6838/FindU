@@ -126,7 +126,10 @@ export default function PostDetail({ itemId, onNavigate }) {
     if (!postData.writerId) return alert("작성자 정보를 확인할 수 없어 채팅을 시작할 수 없습니다.");
 
     try {
-      const roomRes = await api.post('/api/chat-rooms', { userId: postData.writerId });
+      const roomRes = await api.post('/api/chat-rooms', {
+        userId: postData.writerId,
+        itemId: postData.id,
+      });
       onNavigate('chat-room', { post: postData, room: roomRes.data });
     } catch {
       alert("채팅방 생성에 실패했습니다.");
