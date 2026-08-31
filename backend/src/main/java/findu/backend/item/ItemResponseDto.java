@@ -20,6 +20,7 @@ public class ItemResponseDto {
     private ItemStatus status;
     private Long categoryId;
     private String categoryName;
+    private Long writerId;
     private String writerEmail;
     private LocalDateTime createdAt;
 
@@ -37,6 +38,7 @@ public class ItemResponseDto {
                 .status(item.getStatus())
                 .categoryId(item.getCategory() != null ? item.getCategory().getId() : null)
                 .categoryName(item.getCategory() != null ? item.getCategory().getName() : null)
+                .writerId(item.getUser() != null ? item.getUser().getId() : null)
                 .writerEmail(item.getUser() != null ? item.getUser().getEmail() : null) 
                 .createdAt(item.getCreatedAt())
                 .build();

@@ -1,17 +1,24 @@
 // NotificationDropdown.jsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import api from '../api/axios';
 
 // 네비게이션바 알림 드롭다운 컴포넌트
 export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const dropdownRef = useRef(null);
 
-  // 임시 알림 데이터
-  const notifications = [
-    { id: 1, type: 'CHAT', message: '사나운 코끼리님이 채팅을 보냈습니다.', time: '10분 전', isRead: false },
-    { id: 2, type: 'MATCH', message: '내 분실물과 유사한 습득물이 발견되었습니다.', time: '1시간 전', isRead: false },
-  ];
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setNotifications([]);
+      return;
+    }
+
+    api.get('/api/notifications')
+      .then(res => setNotifications(res.data || []))
+      .catch(() => setNotifications([]));
+  }, [isLoggedIn]);
 
   // 드롭다운 외부 영역 클릭 시 닫기
   useEffect(() => {
@@ -24,7 +31,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const hasUnread = notifications.some(noti => !noti.isRead);
+  const hasUnread = notifications.some(noti => !noti.read);
 
   // 알림 토글 핸들러
   const handleToggle = () => {
@@ -34,6 +41,26 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
       return;
     }
     setIsOpen(!isOpen);
+  };
+
+  const formatTime = (createdAt) => {
+    if (!createdAt) return '';
+    return createdAt.replace('T', ' ').slice(0, 16);
+  };
+
+  const handleRead = async (noti) => {
+    if (!noti.read) {
+      try {
+        await api.patch(`/api/notifications/${noti.id}/read`);
+        setNotifications(prev => prev.map(item => item.id === noti.id ? { ...item, read: true } : item));
+      } catch (error) {
+        console.error('알림 읽음 처리 실패:', error);
+      }
+    }
+  };
+
+  const handleReadAll = async () => {
+    await Promise.all(notifications.filter(noti => !noti.read).map(handleRead));
   };
 
   return (
@@ -50,20 +77,23 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
         <div style={dropdownStyle}>
           <div style={headerStyle}>
             <h4 style={headerTitleStyle}>알림</h4>
-            <button style={readAllBtnStyle} onClick={() => alert('모두 읽음 처리되었습니다.')}>
+            <button style={readAllBtnStyle} onClick={handleReadAll}>
               모두 읽음
             </button>
           </div>
 
           <ul style={listStyle}>
-            {notifications.map((noti) => (
+            {notifications.length === 0 ? (
+              <li style={{ ...listItemStyle, cursor: 'default', color: '#9ca3af' }}>새 알림이 없습니다.</li>
+            ) : notifications.map((noti) => (
               <li 
                 key={noti.id} 
                 style={{
                   ...listItemStyle,
-                  backgroundColor: noti.isRead ? '#ffffff' : '#eff6ff'
+                  backgroundColor: noti.read ? '#ffffff' : '#eff6ff'
                 }}
-                onClick={() => {
+                onClick={async () => {
+                  await handleRead(noti);
                   setIsOpen(false);
                   if (noti.type === 'CHAT') onNavigate('chat-room');
                   else onNavigate('detail');
@@ -74,7 +104,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
                 </div>
                 <div style={contentStyle}>
                   <p style={messageStyle}>{noti.message}</p>
-                  <span style={timeStyle}>{noti.time}</span>
+                  <span style={timeStyle}>{formatTime(noti.createdAt)}</span>
                 </div>
               </li>
             ))}

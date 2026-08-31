@@ -1,5 +1,3 @@
-import React from 'react';
-
 // 구글 OAuth 2.0 로그인 화면 컴포넌트
 export default function Login() {
   

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // 백엔드 통신용
+import { useState, useEffect } from 'react';
+import api from '../api/axios';
 
 // 카테고리 이름 변환용 맵핑
 const CATEGORY_MAP = {
@@ -23,8 +23,7 @@ export default function SimilarItemsModal({ isOpen, onClose, baseItemTitle, base
     if (!isOpen) return;
 
     setLoading(true);
-    // 습득물(FOUND) 데이터 호출
-    axios.get('http://localhost:8080/api/items?type=FOUND')
+    api.get('/api/items?type=FOUND')
       .then(res => {
         const allFoundItems = res.data || [];
         

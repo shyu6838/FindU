@@ -1,22 +1,42 @@
 // ReportModal.jsx
 
-import React, { useState } from 'react';
+import { useState } from 'react';
+import api from '../api/axios';
 
 // 게시글 및 채팅 신고 모달 컴포넌트
-function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = '' }) {
+function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = '', targetId = null }) {
   const [reason, setReason] = useState('부적절한 내용 / 허위 정보');
   const [details, setDetails] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
   // 신고 데이터 제출 핸들러
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    alert(`[${targetType} 신고 접수 완료]\n- 사유: ${reason}\n- 상세내용: ${details || '없음'}`);
-    
-    setDetails('');
-    onClose();
+
+    if (!targetId) {
+      alert('신고 대상을 확인할 수 없습니다.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await api.post('/api/reports', {
+        targetType,
+        targetId,
+        reason,
+        description: details,
+      });
+
+      alert('신고가 접수되었습니다.');
+      setDetails('');
+      onClose();
+    } catch {
+      alert('신고 접수에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -76,8 +96,8 @@ function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = 
             <button type="button" onClick={onClose} style={cancelButtonStyle}>
               취소
             </button>
-            <button type="submit" style={submitButtonStyle}>
-              신고하기
+            <button type="submit" style={submitButtonStyle} disabled={submitting}>
+              {submitting ? '접수 중...' : '신고하기'}
             </button>
           </div>
         </form>
