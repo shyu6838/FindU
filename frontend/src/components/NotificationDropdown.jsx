@@ -115,6 +115,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     try {
       await api.patch('/api/notifications/read-all');
       setNotifications(prev => prev.map(item => ({ ...item, read: true })));
+      await fetchNotifications();
     } catch {
       alert('모두 읽음 처리에 실패했습니다.');
     }
@@ -152,8 +153,15 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
                 onClick={async () => {
                   await handleRead(noti);
                   setIsOpen(false);
-                  if (noti.type === 'CHAT') onNavigate('chat-room');
-                  else onNavigate('detail');
+                  if (noti.type === 'CHAT' || noti.type === 'CHAT_MATCHED') {
+                    if (noti.targetId) {
+                      onNavigate('chat-room', { room: { id: noti.targetId } });
+                    } else {
+                      onNavigate('mypage');
+                    }
+                  } else {
+                    onNavigate('detail');
+                  }
                 }}
               >
                 <div style={iconBoxStyle}>

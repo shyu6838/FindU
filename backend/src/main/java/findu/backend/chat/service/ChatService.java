@@ -3,6 +3,8 @@ package findu.backend.chat.service;
 import findu.backend.chat.dto.*;
 import findu.backend.chat.entity.*;
 import findu.backend.chat.repository.*;
+import findu.backend.item.Item;
+import findu.backend.item.ItemRepository;
 import findu.backend.notification.service.NotificationService;
 import findu.backend.user.entity.User;
 import findu.backend.user.repository.UserRepository;
@@ -21,6 +23,7 @@ public class ChatService {
     private final ChatRoomRepository rooms;
     private final ChatMessageRepository msgs;
     private final UserRepository users;
+    private final ItemRepository items;
     private final NotificationService notificationService;
 
     private User u(Long id) {
@@ -41,6 +44,15 @@ public class ChatService {
                 );
     }
 
+    private Item item(Long id) {
+        return items.findById(id)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "게시글을 찾을 수 없습니다."
+                        )
+                );
+    }
+
     private void member(ChatRoom r, Long uid) {
         if (!r.getUser1().getId().equals(uid)
                 && !r.getUser2().getId().equals(uid)) {
@@ -54,7 +66,7 @@ public class ChatService {
     /**
      * 채팅방 생성
      *
-     * 같은 두 사용자 사이에 이미 채팅방이 존재하면
+     * 같은 게시글에서 같은 두 사용자 사이에 이미 채팅방이 존재하면
      * 새로운 채팅방을 만들지 않고 기존 채팅방을 반환한다.
      */
     @Transactional
@@ -75,11 +87,20 @@ public class ChatService {
         // 2. 상대방 사용자
         User user2 = u(r.userId());
 
+        Item chatItem = r.itemId() == null ? null : item(r.itemId());
+
+        if (chatItem != null && (chatItem.getUser() == null
+                || !chatItem.getUser().getId().equals(user2.getId()))) {
+            throw new IllegalArgumentException(
+                    "게시글 작성자와만 채팅방을 만들 수 있습니다."
+            );
+        }
+
         // 3. 기존 채팅방 확인
-        Optional<ChatRoom> existingRoom =
-                rooms.findByUser1IdAndUser2Id(
-                        uid,
-                        r.userId()
+        Optional<ChatRoom> existingRoom = chatItem == null
+                ? rooms.findByUser1IdAndUser2Id(uid, r.userId())
+                : rooms.findByItemIdAndUser1IdAndUser2Id(
+                        chatItem.getId(), uid, r.userId()
                 );
 
         if (existingRoom.isPresent()) {
@@ -89,10 +110,10 @@ public class ChatService {
         }
 
         // 4. 반대 방향도 확인
-        existingRoom =
-                rooms.findByUser2IdAndUser1Id(
-                        uid,
-                        r.userId()
+        existingRoom = chatItem == null
+                ? rooms.findByUser2IdAndUser1Id(uid, r.userId())
+                : rooms.findByItemIdAndUser2IdAndUser1Id(
+                        chatItem.getId(), uid, r.userId()
                 );
 
         if (existingRoom.isPresent()) {
@@ -105,6 +126,7 @@ public class ChatService {
         ChatRoom chatRoom = ChatRoom.builder()
                 .user1(user1)
                 .user2(user2)
+                .item(chatItem)
                 .build();
 
         ChatRoom savedRoom = rooms.save(chatRoom);
@@ -112,13 +134,15 @@ public class ChatService {
         notificationService.create(
                 user1.getId(),
                 "CHAT_MATCHED",
-                user2.getNickname() + "님과 채팅이 매칭되었습니다."
+                user2.getNickname() + "님과 채팅이 매칭되었습니다.",
+                savedRoom.getId()
         );
 
         notificationService.create(
                 user2.getId(),
                 "CHAT_MATCHED",
-                user1.getNickname() + "님과 채팅이 매칭되었습니다."
+                user1.getNickname() + "님과 채팅이 매칭되었습니다.",
+                savedRoom.getId()
         );
 
         return ChatRoomResponse.from(savedRoom);
@@ -138,6 +162,13 @@ public class ChatService {
                 .stream()
                 .map(ChatRoomResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ChatRoomResponse room(Long uid, Long roomId) {
+        ChatRoom chatRoom = room(roomId);
+        member(chatRoom, uid);
+        return ChatRoomResponse.from(chatRoom);
     }
 
     /**
@@ -201,7 +232,8 @@ public class ChatService {
         notificationService.create(
                 receiver.getId(),
                 "CHAT",
-                sender.getNickname() + "님에게서 새로운 메시지가 도착하였습니다."
+                sender.getNickname() + "님에게서 새로운 메시지가 도착하였습니다.",
+                room.getId()
         );
     }
 

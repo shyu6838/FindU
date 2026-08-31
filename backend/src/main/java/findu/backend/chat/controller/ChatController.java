@@ -31,6 +31,14 @@ public class ChatController {
         return s.rooms(uid);
     }
 
+    @GetMapping("/{roomId}")
+    public ChatRoomResponse room(
+            @AuthenticationPrincipal Long uid,
+            @PathVariable Long roomId
+    ) {
+        return s.room(uid, roomId);
+    }
+
     @GetMapping("/{roomId}/messages")
     public List<ChatMessageResponse> messages(
             @AuthenticationPrincipal Long uid,

@@ -51,6 +51,16 @@ public class NotificationService {
     // 알림 생성
     @Transactional
     public void create(Long userId, String type, String message) {
+        create(userId, type, message, null);
+    }
+
+    @Transactional
+    public void create(
+            Long userId,
+            String type,
+            String message,
+            Long targetId
+    ) {
         User user = users.findById(userId)
                 .orElseThrow(() ->
                         new IllegalArgumentException("사용자를 찾을 수 없습니다.")
@@ -60,6 +70,7 @@ public class NotificationService {
                 .user(user)
                 .type(type)
                 .message(message)
+                .targetId(targetId)
                 .build();
 
         Notification savedNotification = repo.save(notification);
