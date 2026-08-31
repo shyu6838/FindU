@@ -1,35 +1,44 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import api from '../api/axios';
 
-/**
- * [Home.jsx]
- * 캡스톤디자인 분실물 찾기 서비스(FindU)의 메인 홈 화면 컴포넌트입니다.
- * - 주요 역할: 서비스 소개 배너, 최근 분실물/습득물 요약 목록 제공, 이용 방법 안내
- */
-
-// ---------------------------------------------------------
-// 1. 임시 더미 데이터 (향후 백엔드 API와 연동하여 실제 데이터를 받아올 부분)
-// ---------------------------------------------------------
-const recentLostItems = [
-  { id: 1, title: '검은색 가죽 지갑', location: '도서관 3층', date: '2026-07-19' },
-  { id: 2, title: '에어팟 프로 본체', location: '공학관 1층', date: '2026-07-19' },
-  { id: 3, title: '로지텍 무선 마우스', location: '향파관 1층', date: '2026-07-19' },
-];
-
-const recentFoundItems = [
-  { id: 1, title: '파란색 우산', location: '학생회관 식당', date: '2026-07-19' },
-  { id: 2, title: '학생증 (김**)', location: '정문 버스정류장', date: '2026-07-19' },
-  { id: 3, title: '노트북 파우치', location: '중앙도서관 4층 열람실', date: '2026-07-18' },
-];
-
-
-// ---------------------------------------------------------
-// 2. 메인 컴포넌트
-// ---------------------------------------------------------
+// 메인 홈 화면 컴포넌트
+// 서비스 소개, 최근 게시물 요약, 이용 방법 안내 제공
 function Home({ requireLogin, changePage }) {
+  const [lostItems, setLostItems] = useState([]);
+  const [foundItems, setFoundItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 최근 게시글 목록 조회
+  useEffect(() => {
+    const fetchRecentItems = async () => {
+      try {
+        const res = await api.get('/api/items');
+        const allItems = res.data || [];
+
+        const recentLost = allItems
+          .filter(item => item.type === 'LOST')
+          .slice(0, 3);
+
+        const recentFound = allItems
+          .filter(item => item.type === 'FOUND')
+          .slice(0, 3);
+
+        setLostItems(recentLost);
+        setFoundItems(recentFound);
+      } catch (err) {
+        console.error("게시글 로딩 실패:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecentItems();
+  }, []);
+
   return (
     <div style={styles.container}>
       
-      {/* 상단: 서비스 소개 배너 및 신고하기 버튼 */}
+      {/* 서비스 소개 배너 */}
       <div style={styles.banner}>
         <h2 style={styles.bannerTitle}>캠퍼스 분실물 찾기 서비스 FindU</h2>
         <p style={styles.bannerText}>잃어버린 물건을 찾거나, 습득한 물건의 주인을 찾아주세요.</p>
@@ -38,10 +47,10 @@ function Home({ requireLogin, changePage }) {
         </button>
       </div>
 
-      {/* 중단: 최근 등록된 게시물 (분실물 / 습득물 2단 그리드) */}
+      {/* 최근 게시물 목록 */}
       <div style={styles.gridContainer}>
         
-        {/* 최근 분실물 컬럼 */}
+        {/* 최근 분실물 */}
         <div style={styles.column}>
           <div 
             style={styles.sectionHeaderContainer} 
@@ -52,15 +61,27 @@ function Home({ requireLogin, changePage }) {
             <span style={styles.arrowIcon}>➔</span>
           </div>
           
-          {recentLostItems.map(item => (
-            <div key={item.id} style={styles.card}>
-              <h4 style={styles.cardTitle}>{item.title}</h4>
-              <p style={styles.cardInfo}>{item.location} | 📅 {item.date}</p>
-            </div>
-          ))}
+          {loading ? (
+            <p style={styles.loadingText}>불러오는 중...</p>
+          ) : lostItems.length === 0 ? (
+            <p style={styles.emptyText}>최근 등록된 분실물이 없습니다.</p>
+          ) : (
+            lostItems.map(item => (
+              <div 
+                key={item.id} 
+                style={styles.card}
+                onClick={() => changePage('post-detail', item.id)}
+              >
+                <h4 style={styles.cardTitle}>{item.title}</h4>
+                <p style={styles.cardInfo}>
+                  {item.location || '장소 미상'} |  {item.eventDate ? item.eventDate.split('T')[0] : '날짜 미상'}
+                </p>
+              </div>
+            ))
+          )}
         </div>
 
-        {/* 최근 습득물 컬럼 */}
+        {/* 최근 습득물 */}
         <div style={styles.column}>
           <div 
             style={styles.sectionHeaderContainer} 
@@ -71,21 +92,33 @@ function Home({ requireLogin, changePage }) {
             <span style={styles.arrowIcon}>➔</span>
           </div>
 
-          {recentFoundItems.map(item => (
-            <div key={item.id} style={styles.card}>
-              <h4 style={styles.cardTitle}>{item.title}</h4>
-              <p style={styles.cardInfo}>{item.location} | 📅 {item.date}</p>
-            </div>
-          ))}
+          {loading ? (
+            <p style={styles.loadingText}>불러오는 중...</p>
+          ) : foundItems.length === 0 ? (
+            <p style={styles.emptyText}>최근 등록된 습득물이 없습니다.</p>
+          ) : (
+            foundItems.map(item => (
+              <div 
+                key={item.id} 
+                style={styles.card}
+                onClick={() => changePage('post-detail', item.id)}
+              >
+                <h4 style={styles.cardTitle}>{item.title}</h4>
+                <p style={styles.cardInfo}>
+                  {item.location || '장소 미상'} |  {item.eventDate ? item.eventDate.split('T')[0] : '날짜 미상'}
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* 하단: 서비스 이용 방법 안내 섹션 */}
+      {/* 서비스 이용 방법 안내 */}
       <div style={styles.infoContainer}>
-        <h3 style={styles.infoMainTitle}>💡 FindU 이용 방법</h3>
+        <h3 style={styles.infoMainTitle}>FindU 이용 방법</h3>
         <div style={styles.infoGrid}>
           
-          {/* 습득자 가이드 */}
+          {/* 습득자 안내 */}
           <div style={styles.infoColumn}>
             <h4 style={styles.infoSubTitle}>습득자의 경우 (물건을 주웠을 때)</h4>
             <ol style={styles.infoList}>
@@ -96,7 +129,7 @@ function Home({ requireLogin, changePage }) {
             </ol>
           </div>
 
-          {/* 분실자 가이드 */}
+          {/* 분실자 안내 */}
           <div style={styles.infoColumn}>
             <h4 style={{ ...styles.infoSubTitle, color: '#ff8c00' }}>분실자의 경우 (물건을 잃어버렸을 때)</h4>
             <ol style={styles.infoList}>
@@ -112,9 +145,7 @@ function Home({ requireLogin, changePage }) {
   );
 }
 
-// ---------------------------------------------------------
-// 3. UI 스타일 정의
-// ---------------------------------------------------------
+// UI 스타일 정의
 const styles = {
   container: { padding: '20px', maxWidth: '1000px', margin: '0 auto', color: 'black' },
   banner: {
@@ -130,7 +161,6 @@ const styles = {
   },
   gridContainer: { display: 'flex', gap: '20px' },
   column: { flex: 1, backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #eee' },
-  
   sectionHeaderContainer: {
     display: 'flex', 
     justifyContent: 'space-between', 
@@ -142,14 +172,14 @@ const styles = {
   },
   sectionTitle: { margin: 0, fontSize: '18px', fontWeight: 'bold', color: 'black' },
   arrowIcon: { fontSize: '18px', color: '#007bff', fontWeight: 'bold' },
-  
   card: {
     border: '1px solid #ddd', borderRadius: '8px', padding: '15px', marginBottom: '10px',
-    backgroundColor: '#fafafa'
+    backgroundColor: '#fafafa', cursor: 'pointer', transition: 'background-color 0.2s ease'
   },
   cardTitle: { margin: '0 0 5px 0', fontSize: '16px', fontWeight: 'bold', color: 'black' },
   cardInfo: { margin: 0, fontSize: '14px', color: 'black' },
-
+  loadingText: { color: '#6b7280', fontSize: '14px', textAlign: 'center' },
+  emptyText: { color: '#9ca3af', fontSize: '14px', textAlign: 'center', padding: '20px 0' },
   infoContainer: {
     marginTop: '40px',
     backgroundColor: '#f8f9fa',

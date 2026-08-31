@@ -1,155 +1,355 @@
-import React, { useState, useEffect } from 'react';
+// ReportForm.jsx
 
-/**
- * [ReportForm.jsx]
- * 분실물 및 습득물을 신고(등록)하는 폼 페이지 컴포넌트입니다.
- * - 주요 역할: 사용자가 물품 정보(분류, 이름, 장소, 시간, 사진 등)를 입력하고 등록할 수 있게 합니다.
- * - 특징: '습득(found)' 선택 시 분실자를 확인하기 위한 '본인확인 질문' 입력란이 조건부로 나타납니다.
- */
+import { useState, useEffect } from 'react';
+import api from '../api/axios';
 
-const ReportForm = ({ setCurrentPage, initialType = 'lost' }) => {
-  // [상태 관리] 신고 유형 (분실 'lost' 또는 습득 'found')
+// 기본 카테고리 목록 설정
+const DEFAULT_CATEGORIES = [
+  { id: 1, name: '카드/신분증' },
+  { id: 2, name: '이어폰/헤드폰' },
+  { id: 3, name: '스마트폰/노트북/태블릿' },
+  { id: 4, name: '지갑' },
+  { id: 5, name: '책/노트/필기구' },
+  { id: 6, name: '가방/파우치' },
+  { id: 7, name: '의류/모자' },
+  { id: 8, name: '기타 전자기기' },
+  { id: 9, name: '기타' }
+];
+
+// 분실 및 습득 신고 게시물 작성 및 수정 폼 컴포넌트
+export default function ReportForm({ setCurrentPage, initialType = 'lost', editData = null }) {
+  const isEditMode = !!editData;
   const [reportType, setReportType] = useState(initialType);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
 
-  // [효과] 외부(홈 화면 등)에서 넘어온 initialType이 변경되면 상태를 동기화
+  const [formData, setFormData] = useState({
+    categoryId: '',
+    title: '',
+    location: '',
+    eventDate: '',
+    eventTime: '',
+    content: '',
+    question: '',
+    answer: '',
+    image: null
+  });
+
+  // 수정 모드일 경우 기존 데이터 세팅 및 카테고리 목록 조회
   useEffect(() => {
-    setReportType(initialType);
-  }, [initialType]);
+    if (editData) {
+      setReportType(editData.type ? editData.type.toLowerCase() : 'lost');
+      
+      const dateParts = editData.eventDate ? editData.eventDate.split('T') : ['', ''];
+      setFormData({
+        categoryId: editData.categoryId || '',
+        title: editData.title || '',
+        location: editData.location || '',
+        eventDate: dateParts[0] || '',
+        eventTime: dateParts[1] ? dateParts[1].substring(0, 5) : '',
+        content: editData.content || '',
+        question: editData.question || '',
+        answer: editData.answer || '',
+        image: null
+      });
+    } else {
+      setReportType(initialType);
+    }
+
+    api.get('/api/categories')
+      .then(res => {
+        if (res.data && res.data.length > 0) {
+          setCategories(res.data);
+        }
+      })
+      .catch(err => console.error("카테고리 정보 로드 실패:", err));
+  }, [editData, initialType]);
+
+  // 입력 폼 변경 핸들러
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    if (name === 'image') {
+      setFormData(prev => ({ ...prev, image: files[0] }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // 카테고리 선택 핸들러
+  const handleCategorySelect = (id) => {
+    setFormData(prev => ({ ...prev, categoryId: id }));
+  };
+
+  // 게시물 폼 제출 핸들러
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.categoryId) {
+      alert("카테고리를 선택해주세요.");
+      return;
+    }
+
+    const dateTime = formData.eventTime 
+      ? `${formData.eventDate}T${formData.eventTime}:00` 
+      : `${formData.eventDate}T00:00:00`;
+
+    const requestData = {
+      type: reportType.toUpperCase(),
+      title: formData.title,
+      content: formData.content,
+      location: formData.location,
+      eventDate: dateTime,
+      imageUrl: editData?.imageUrl || null,
+      question: reportType === 'found' ? formData.question : null,
+      answer: reportType === 'found' ? formData.answer : null,
+      categoryId: parseInt(formData.categoryId)
+    };
+
+    try {
+      if (formData.image) {
+        const imageFormData = new FormData();
+        imageFormData.append('file', formData.image);
+        const imageRes = await api.post('/api/images', imageFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        requestData.imageUrl = imageRes.data?.imageUrl || requestData.imageUrl;
+      }
+      
+      if (isEditMode) {
+        await api.put(`/api/items/${editData.id}`, requestData);
+        alert('게시물이 수정되었습니다.');
+        setCurrentPage('post-detail', editData.id);
+      } else {
+        await api.post('/api/items', requestData);
+        alert('게시물이 성공적으로 등록되었습니다.');
+        setCurrentPage(reportType === 'lost' ? 'lost-list' : 'found-list'); 
+      }
+    } catch {
+      alert(isEditMode ? '게시물 수정에 실패했습니다.' : '게시물 등록에 실패했습니다.');
+    }
+  };
 
   return (
     <div style={styles.page}>
+      <h2 style={styles.pageTitle}>{isEditMode ? '게시물 수정하기' : '분실/습득 신고하기'}</h2>
       
-      {/* 상단 타이틀 */}
-      <h2 style={styles.pageTitle}>
-        분실/습득 신고하기
-      </h2>
-      
-      {/* 1. 구분 및 분류 선택 */}
-      <div style={styles.formGroup}>
-        <label style={styles.label}>구분</label>
-        <select style={styles.input} value={reportType} onChange={(e) => setReportType(e.target.value)}>
-          <option value="lost">물건을 잃어버렸습니다 (분실)</option>
-          <option value="found">물건을 찾았습니다 (습득)</option>
-        </select>
-      </div>
+      <form onSubmit={handleSubmit} style={styles.formContainer}>
+        
+        <div style={styles.formGroup}>
+          <label style={styles.label}>구분</label>
+          <select 
+            style={styles.input} 
+            value={reportType} 
+            onChange={(e) => setReportType(e.target.value)} 
+            disabled={isEditMode}
+          >
+            <option value="lost">물건을 잃어버렸습니다 (분실)</option>
+            <option value="found">물건을 찾았습니다 (습득)</option>
+          </select>
+        </div>
 
-      <div style={styles.formGroup}>
-        <label style={styles.label}>분류</label>
-        <select style={styles.input}>
-          <option>전자기기</option>
-          <option>지갑/카드</option>
-          <option>가방</option>
-          <option>의류</option>
-          <option>악세서리</option>
-          <option>책/노트</option>
-          <option>우산</option>
-          <option>기타</option>
-        </select>
-      </div>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>분류 (카테고리)</label>
+          <div style={styles.categoryWrapper}>
+            {categories.map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => handleCategorySelect(c.id)}
+                style={{
+                  ...styles.categoryButton,
+                  border: formData.categoryId === c.id ? 'none' : '1px solid #d1d5db',
+                  backgroundColor: formData.categoryId === c.id ? '#2563eb' : '#fff',
+                  color: formData.categoryId === c.id ? '#fff' : '#374151',
+                  fontWeight: formData.categoryId === c.id ? 'bold' : 'normal'
+                }}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      {/* 2. 상세 정보 입력 (물품명, 장소) */}
-      <div style={styles.formGroup}>
-        <label style={styles.label}>물품명</label>
-        <input type="text" style={styles.input} placeholder="예: 검은색 가죽 지갑" />
-      </div>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>사진 첨부</label>
+          <input 
+            type="file" 
+            accept="image/*" 
+            name="image" 
+            onChange={handleChange} 
+            style={styles.fileInput} 
+          />
+        </div>
 
-      <div style={styles.formGroup}>
-        <label style={styles.label}>장소</label>
-        <div style={styles.flexGroup}>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>물품명</label>
           <input 
             type="text" 
-            style={{ ...styles.input, flex: 1 }} 
-            placeholder="예: 중앙도서관 3층 열람실" 
-          />
-          <button 
-            style={styles.mapButton} 
-            onClick={(e) => { 
-              e.preventDefault(); 
-              alert('🗺️ 카카오맵 API 창이 열려 위치를 핀(Pin) 할 수 있게 될 예정입니다!'); 
-            }}
-          >
-            📍 지도에서 찾기
-          </button>
-        </div>
-      </div>
-
-      {/* 3. 날짜 및 시간 입력 */}
-      {/* 💡 날짜(필수)와 시간(선택) 입력창 분리*/}
-      <div style={styles.formGroup}>
-        <label style={styles.label}>날짜 (필수) 및 시간 (선택)</label>
-        <div style={styles.flexGroup}>
-          <input 
-            type="date" 
-            style={{ ...styles.datetime, flex: 1 }} 
+            name="title" 
+            value={formData.title} 
+            onChange={handleChange} 
+            style={styles.input} 
+            placeholder="예) 검은색 가죽 지갑" 
             required 
-            title="날짜는 필수 입력입니다."
-          />
-          <input 
-            type="time" 
-            style={{ ...styles.datetime, flex: 1 }} 
-            title="시간은 선택 사항입니다."
           />
         </div>
-      </div>
 
-      {/* 4. 조건부 입력: 습득물일 경우에만 나타나는 본인확인 질문 */}
-      {reportType === 'found' && (
         <div style={styles.formGroup}>
-          <label style={styles.label}>본인확인 질문</label>
-          <input type="text" style={styles.input} placeholder="예: 지갑 안에 들어있는 신분증의 이름은?" />
+          <label style={styles.label}>장소</label>
+          <input 
+            type="text" 
+            name="location" 
+            value={formData.location} 
+            onChange={handleChange} 
+            style={styles.input} 
+            placeholder="예) 도서관 3층 열람실" 
+            required 
+          />
         </div>
-      )}
 
-      {/* 5. 파일 및 텍스트 첨부 */}
-      <div style={styles.formGroup}>
-        <label style={styles.label}>이미지 첨부</label>
-        <input type="file" style={{ ...styles.input, padding: '10px' }} />
-      </div>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>날짜 및 시간</label>
+          <div style={styles.dateTimeWrapper}>
+            <input 
+              type="date" 
+              name="eventDate" 
+              value={formData.eventDate} 
+              onChange={handleChange} 
+              style={styles.input} 
+              required 
+            />
+            <input 
+              type="time" 
+              name="eventTime" 
+              value={formData.eventTime} 
+              onChange={handleChange} 
+              style={styles.input} 
+            />
+          </div>
+        </div>
 
-      <div style={styles.formGroup}>
-        <label style={styles.label}>상세 내용</label>
-        <textarea style={{ ...styles.input, minHeight: '160px', resize: 'vertical' }} placeholder="상세한 설명을 적어주세요."></textarea>
-      </div>
+        {reportType === 'found' && (
+          <>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>본인 확인 질문 (주인 검증용)</label>
+              <input 
+                type="text" 
+                name="question" 
+                value={formData.question} 
+                onChange={handleChange} 
+                style={styles.input} 
+                placeholder="예) 지갑 안 신분증의 이름은?" 
+                required 
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>본인 확인 정답</label>
+              <input 
+                type="text" 
+                name="answer" 
+                value={formData.answer} 
+                onChange={handleChange} 
+                style={styles.input} 
+                placeholder="예) 홍길동" 
+                required 
+              />
+            </div>
+          </>
+        )}
 
-      {/* 6. 하단 액션 버튼 */}
-      <div style={styles.buttonGroup}>
-        <button 
-          style={styles.primaryButton} 
-          onClick={() => { alert('신고가 성공적으로 등록되었습니다.'); setCurrentPage('home'); }}
-        >
-          등록하기
+        <div style={styles.formGroup}>
+          <label style={styles.label}>상세 설명</label>
+          <textarea 
+            name="content" 
+            value={formData.content} 
+            onChange={handleChange} 
+            style={{ ...styles.input, height: '120px', resize: 'vertical' }} 
+            placeholder="물품의 특징, 상태 등을 자세히 적어주세요." 
+            required 
+          />
+        </div>
+
+        <button type="submit" style={styles.submitButton}>
+          {isEditMode ? '수정 완료' : '등록하기'}
         </button>
-        <button 
-          style={styles.cancelButton} 
-          onClick={() => setCurrentPage('home')}
-        >
-          취소
-        </button>
-      </div>
+      </form>
     </div>
   );
-};
+}
 
-// ---------------------------------------------------------
-// UI 스타일 정의
-// ---------------------------------------------------------
+// 스타일 속성
 const styles = {
-  page: { padding: '40px 20px', maxWidth: '800px', margin: '0 auto', fontFamily: "'Pretendard', sans-serif" },
-  pageTitle: { color: '#111827', fontSize: '28px', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px', marginBottom: '32px', marginTop: 0 },
-  formGroup: { marginBottom: '24px' },
-  label: { fontWeight: 'bold', display: 'block', marginBottom: '10px', color: '#374151', fontSize: '15px' },
-  
-  // 공통 인풋 스타일
-  input: { width: '100%', padding: '14px', border: '1px solid #d1d5db', backgroundColor: '#fff', color: '#111827', borderRadius: '10px', boxSizing: 'border-box', fontSize: '15px', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
-  
-  // 달력/시간 전용 인풋 스타일
-  datetime: { width: '100%', padding: '14px', border: '1px solid #d1d5db', backgroundColor: '#fff', color: '#111827', borderRadius: '10px', boxSizing: 'border-box', fontSize: '15px', outline: 'none', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', colorScheme: 'light', fontFamily: "inherit", cursor: 'pointer' },
-  
-  flexGroup: { display: 'flex', gap: '10px' },
-  mapButton: { padding: '0 20px', backgroundColor: '#f9fafb', color: '#374151', border: '1px solid #d1d5db', borderRadius: '10px', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' },
-  buttonGroup: { display: 'flex', gap: '12px', marginTop: '40px' },
-  primaryButton: { padding: '14px 28px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', flex: 1, boxShadow: '0 4px 6px rgba(37, 99, 235, 0.2)' },
-  cancelButton: { padding: '14px 28px', backgroundColor: '#f3f4f6', color: '#4b5563', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }
+  page: { 
+    maxWidth: '600px', 
+    margin: '0 auto', 
+    padding: '40px 20px', 
+    fontFamily: "'Pretendard', sans-serif" 
+  },
+  pageTitle: { 
+    fontSize: '24px', 
+    fontWeight: 'bold', 
+    marginBottom: '24px', 
+    color: '#111827' 
+  },
+  formContainer: { 
+    backgroundColor: '#fff', 
+    padding: '30px', 
+    borderRadius: '16px', 
+    boxShadow: '0 4px 6px rgba(0,0,0,0.05)' 
+  },
+  formGroup: { 
+    marginBottom: '20px' 
+  },
+  label: { 
+    display: 'block', 
+    fontWeight: 'bold', 
+    marginBottom: '8px', 
+    color: '#374151' 
+  },
+  input: { 
+    width: '100%', 
+    padding: '12px', 
+    border: '1px solid #d1d5db', 
+    borderRadius: '8px', 
+    fontSize: '15px', 
+    boxSizing: 'border-box', 
+    backgroundColor: '#ffffff', 
+    color: '#111827', 
+    colorScheme: 'light' 
+  },
+  categoryWrapper: { 
+    display: 'flex', 
+    gap: '8px', 
+    flexWrap: 'wrap' 
+  },
+  categoryButton: {
+    padding: '8px 16px',
+    borderRadius: '20px',
+    fontSize: '14px',
+    cursor: 'pointer'
+  },
+  fileInput: { 
+    width: '100%', 
+    padding: '10px', 
+    border: '1px solid #d1d5db', 
+    borderRadius: '8px', 
+    fontSize: '14px', 
+    backgroundColor: '#f9fafb', 
+    color: '#111827' 
+  },
+  dateTimeWrapper: { 
+    display: 'flex', 
+    gap: '10px' 
+  },
+  submitButton: { 
+    width: '100%', 
+    padding: '14px', 
+    backgroundColor: '#2563eb', 
+    color: '#ffffff', 
+    border: 'none', 
+    borderRadius: '8px', 
+    fontSize: '16px', 
+    fontWeight: 'bold', 
+    cursor: 'pointer', 
+    marginTop: '10px' 
+  }
 };
-
-export default ReportForm;

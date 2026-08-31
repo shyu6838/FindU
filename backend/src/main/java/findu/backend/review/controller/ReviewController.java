@@ -1,0 +1,33 @@
+package findu.backend.review.controller;
+
+import findu.backend.review.dto.*;
+import findu.backend.review.service.ReviewService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/reviews")
+public class ReviewController {
+
+    private final ReviewService s;
+
+    @PostMapping
+    public ReviewResponse create(
+            @AuthenticationPrincipal Long uid,
+            @Valid @RequestBody ReviewCreateRequest r
+    ) {
+        return s.create(uid, r);
+    }
+
+    @GetMapping("/users/{userId}")
+    public List<ReviewResponse> list(
+            @PathVariable Long userId
+    ) {
+        return s.list(userId);
+    }
+}

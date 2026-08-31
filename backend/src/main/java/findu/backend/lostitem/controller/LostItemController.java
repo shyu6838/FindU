@@ -1,3 +1,65 @@
 package findu.backend.lostitem.controller;
-import findu.backend.lostitem.dto.*; import findu.backend.lostitem.service.LostItemService; import jakarta.validation.Valid; import lombok.RequiredArgsConstructor; import org.springframework.http.*; import org.springframework.security.core.annotation.AuthenticationPrincipal; import org.springframework.web.bind.annotation.*; import java.util.*;
-@RestController @RequiredArgsConstructor @RequestMapping("/api/lost-items") public class LostItemController { private final LostItemService s; @PostMapping public LostItemResponseDto create(@AuthenticationPrincipal Long uid,@Valid @RequestBody LostItemRequestDto r){return s.create(uid,r);} @GetMapping public List<LostItemResponseDto> list(){return s.list();} @GetMapping("/{id}") public LostItemResponseDto get(@PathVariable Long id){return s.get(id);} @PutMapping("/{id}") public LostItemResponseDto update(@AuthenticationPrincipal Long uid,@PathVariable Long id,@Valid @RequestBody LostItemRequestDto r){return s.update(uid,id,r);} @DeleteMapping("/{id}") public ResponseEntity<Void> delete(@AuthenticationPrincipal Long uid,@PathVariable Long id){s.delete(uid,id);return ResponseEntity.noContent().build();} }
+
+import findu.backend.lostitem.dto.*;
+import findu.backend.lostitem.service.LostItemService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/lost-items")
+public class LostItemController {
+
+    private final LostItemService s;
+
+    @PostMapping
+    public LostItemResponseDto create(
+            @AuthenticationPrincipal Long uid,
+            @Valid @RequestBody LostItemRequestDto r
+    ) {
+        return s.create(uid, r);
+    }
+
+    @GetMapping
+    public List<LostItemResponseDto> list() {
+        return s.list();
+    }
+
+    // 분실물 키워드 검색
+    @GetMapping("/search")
+    public List<LostItemResponseDto> search(
+            @RequestParam String keyword
+    ) {
+        return s.search(keyword);
+    }
+
+    @GetMapping("/{id}")
+    public LostItemResponseDto get(
+            @PathVariable Long id
+    ) {
+        return s.get(id);
+    }
+
+    @PutMapping("/{id}")
+    public LostItemResponseDto update(
+            @AuthenticationPrincipal Long uid,
+            @PathVariable Long id,
+            @Valid @RequestBody LostItemRequestDto r
+    ) {
+        return s.update(uid, id, r);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(
+            @AuthenticationPrincipal Long uid,
+            @PathVariable Long id
+    ) {
+        s.delete(uid, id);
+        return ResponseEntity.noContent().build();
+    }
+}

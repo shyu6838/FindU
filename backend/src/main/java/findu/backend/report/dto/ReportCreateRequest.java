@@ -1,0 +1,1 @@
+package findu.backend.report.dto; import jakarta.validation.constraints.*; public record ReportCreateRequest(@NotBlank String targetType, @NotNull Long targetId, @NotBlank String reason, String description){}

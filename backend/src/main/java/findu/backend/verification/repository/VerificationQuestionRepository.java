@@ -1,0 +1,1 @@
+package findu.backend.verification.repository; import findu.backend.verification.entity.VerificationQuestion; import org.springframework.data.jpa.repository.JpaRepository; import java.util.*; public interface VerificationQuestionRepository extends JpaRepository<VerificationQuestion,Long>{List<VerificationQuestion> findByFoundItemId(Long id);}

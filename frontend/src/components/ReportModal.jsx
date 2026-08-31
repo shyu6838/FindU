@@ -1,44 +1,53 @@
-import React, { useState } from 'react';
+// ReportModal.jsx
 
-/**
- * 신고하기 모달 컴포넌트
- * @param {boolean} isOpen - 모달 열림/닫힘 상태
- * @param {function} onClose - 모달 닫기 함수
- * @param {string} targetType - 신고 대상 ('게시글' | '채팅' 등)
- * @param {string} targetTitle - 신고 대상 게시글 제목 또는 상대방 이름
- */
-function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = '' }) {
+import { useState } from 'react';
+import api from '../api/axios';
+
+// 게시글 및 채팅 신고 모달 컴포넌트
+function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = '', targetId = null }) {
   const [reason, setReason] = useState('부적절한 내용 / 허위 정보');
   const [details, setDetails] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  // 모달이 닫혀있는 상태면 아무것도 렌더링하지 않음
   if (!isOpen) return null;
 
-  // 신고 제출 처리
-  const handleSubmit = (e) => {
+  // 신고 데이터 제출 핸들러
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // 나중에 백엔드 API 연동할 위치
-    alert(`[${targetType} 신고 접수 완료]\n- 사유: ${reason}\n- 상세내용: ${details || '없음'}`);
-    
-    // 폼 초기화 및 모달 닫기
-    setDetails('');
-    onClose();
+
+    if (!targetId) {
+      alert('신고 대상을 확인할 수 없습니다.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await api.post('/api/reports', {
+        targetType,
+        targetId,
+        reason,
+        description: details,
+      });
+
+      alert('신고가 접수되었습니다.');
+      setDetails('');
+      onClose();
+    } catch {
+      alert('신고 접수에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    /* 모달 바깥 배경 (어둡게 처리 + 클릭 시 닫힘) */
     <div style={overlayStyle} onClick={onClose}>
-      {/* 실제 팝업 창 (내부 클릭 시 배경 이벤트 전파 막기) */}
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         
-        {/* 상단 헤더 */}
         <div style={headerStyle}>
           <h3 style={titleStyle}>🚨 {targetType} 신고하기</h3>
           <button style={closeButtonStyle} onClick={onClose}>✕</button>
         </div>
 
-        {/* 신고 대상 요약 정보 */}
         {targetTitle && (
           <div style={targetBoxStyle}>
             <span style={{ fontSize: '13px', color: '#666' }}>신고 대상 : </span>
@@ -47,7 +56,6 @@ function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = 
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* 신고 사유 라디오 버튼 리스트 */}
           <div style={{ marginBottom: '18px' }}>
             <label style={labelStyle}>신고 사유를 선택해 주세요</label>
             <div style={radioGroupStyle}>
@@ -73,7 +81,6 @@ function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = 
             </div>
           </div>
 
-          {/* 상세 사유 입력 (선택) */}
           <div style={{ marginBottom: '22px' }}>
             <label style={labelStyle}>상세 사유 (선택 사항)</label>
             <textarea
@@ -85,13 +92,12 @@ function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = 
             />
           </div>
 
-          {/* 하단 버튼 영역 */}
           <div style={buttonGroupStyle}>
             <button type="button" onClick={onClose} style={cancelButtonStyle}>
               취소
             </button>
-            <button type="submit" style={submitButtonStyle}>
-              신고하기
+            <button type="submit" style={submitButtonStyle} disabled={submitting}>
+              {submitting ? '접수 중...' : '신고하기'}
             </button>
           </div>
         </form>
@@ -100,20 +106,19 @@ function ReportModal({ isOpen, onClose, targetType = '게시글', targetTitle = 
   );
 }
 
-// ------------------- inline-CSS 스타일 ------------------- //
-
+// 스타일 설정
 const overlayStyle = {
   position: 'fixed',
   top: 0,
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(0, 0, 0, 0.45)', // 반투명 검은 배경
+  backgroundColor: 'rgba(0, 0, 0, 0.45)',
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
   zIndex: 1000,
-  backdropFilter: 'blur(3px)' // 은은한 블러 효과
+  backdropFilter: 'blur(3px)'
 };
 
 const modalStyle = {
@@ -214,7 +219,7 @@ const submitButtonStyle = {
   padding: '10px 18px',
   borderRadius: '8px',
   border: 'none',
-  backgroundColor: '#e53e3e', // 신고 경고 느낌의 Red 톤
+  backgroundColor: '#e53e3e',
   color: '#ffffff',
   fontSize: '14px',
   fontWeight: '600',

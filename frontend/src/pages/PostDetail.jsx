@@ -1,179 +1,299 @@
-import React, { useState } from 'react';
+// PostDetail.jsx
+
+import { useState, useEffect } from 'react';
+import api from '../api/axios';
 import ReportModal from '../components/ReportModal';
-import VerifyModal from '../components/VerifyModal'; // 💡 본인 확인 모달 추가
+import VerifyModal from '../components/VerifyModal'; 
+import SimilarItemsModal from '../components/SimilarItemsModal'; 
+import ReviewModal from '../components/ReviewModal'; 
 
-const DEFAULT_ITEM = {
-  id: 1,
-  type: 'FOUND', // 테스트를 위해 기본 타입을 습득(FOUND)으로 설정
-  title: '검은색 가죽 지갑',
-  category: '지갑',
-  location: '인문관 3층 복도',
-  date: '2026-07-24',
-  status: 'KEEPING',
-  image: 'https://via.placeholder.com/600x400?text=Black+Wallet',
-  description: '도서관 3층 복도에서 습득하였습니다. 주인을 찾습니다.',
-  author: '익명_습득자',
-  trustTemp: 36.5,
-  question: '지갑 안에 들어있는 신분증에 있는 이름을 써주세요.', // 💡 습득자가 작성했던 질문
-};
+export default function PostDetail({ itemId, onNavigate }) {
+  const [postData, setPostData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isVerifyOpen, setIsVerifyOpen] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState(null);
+  const [isSimilarModalOpen, setIsSimilarModalOpen] = useState(false); 
+  const [isReviewOpen, setIsReviewOpen] = useState(false); 
+  const [currentUser, setCurrentUser] = useState(null);
 
-export default function PostDetail({ item = DEFAULT_ITEM, onNavigate }) {
-  const postData = item || DEFAULT_ITEM;
+  useEffect(() => {
+    if (!itemId) return;
+    
+    const savedVerifyStatus = localStorage.getItem(`verified_item_${itemId}`);
+    if (savedVerifyStatus === 'true') setIsVerified(true);
+
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      api.get('/api/users/me')
+        .then(res => {
+          setCurrentUser(res.data);
+          setCurrentUserEmail(res.data.email);
+        })
+        .catch(() => {});
+    }
+
+    api.get(`/api/items/${itemId}`)
+      .then(res => {
+        setPostData(res.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
+  }, [itemId]);
+
+  if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>데이터를 불러오는 중입니다.</div>;
+  if (!postData) return <div style={{ textAlign: 'center', padding: '50px' }}>게시물을 찾을 수 없습니다.</div>;
 
   const isLost = postData.type === 'LOST';
   const typeLabel = isLost ? '분실' : '습득';
-  const typeBgColor = isLost ? '#ff4d4f' : '#52c41a';
+  const typeBgColor = isLost ? '#ef4444' : '#10b981';
+  
+  const isMyPost = (currentUser?.id && currentUser.id === postData.writerId) ||
+    (currentUserEmail && currentUserEmail === postData.writerEmail);
 
-  // 💡 상태 관리
-  const [isReportOpen, setIsReportOpen] = useState(false); // 신고 모달 State
-  const [isVerifyOpen, setIsVerifyOpen] = useState(false); // 본인확인 질문 모달 State
-  const [isVerified, setIsVerified] = useState(false);     // 본인확인 통과 여부 State
+  // 로그인 상태 확인
+  const checkLogin = () => {
+    if (!localStorage.getItem('accessToken')) {
+      alert("로그인이 필요한 서비스입니다.");
+      return false;
+    }
+    return true;
+  };
 
-  // 💡 채팅 기능 가능 여부 (분실물은 바로 가능 / 습득물은 본인확인 통과해야 가능)
-  const canChat = isLost || isVerified;
+  // 게시글 삭제 처리
+  const handleDelete = async () => {
+    if (!window.confirm("정말로 이 게시글을 삭제하시겠습니까?")) return;
+    try {
+      await api.delete(`/api/items/${itemId}`);
+      alert("게시글이 삭제되었습니다.");
+      onNavigate(isLost ? 'lost-list' : 'found-list');
+    } catch {
+      alert("삭제 권한이 없거나 오류가 발생했습니다.");
+    }
+  };
+
+  // 게시글 수정 이동
+  const handleEdit = () => onNavigate('edit-item', postData);
+
+  // 완료 상태 업데이트
+  const handleResolve = async () => {
+    try {
+      await api.patch(`/api/items/${itemId}/status?status=RESOLVED`);
+      setPostData(prev => ({ ...prev, status: 'RESOLVED' }));
+    } catch {
+      alert("완료 처리에 실패했습니다.");
+    }
+  };
+
+  // 완료 상태 취소
+  const handleCancelResolve = async () => {
+    if (!window.confirm("완료 처리를 취소하고 다시 '진행 중'으로 변경하시겠습니까?")) return;
+    try {
+      await api.patch(`/api/items/${itemId}/status?status=SEARCHING`);
+      setPostData(prev => ({ ...prev, status: 'SEARCHING' }));
+      alert("완료 처리가 취소되었습니다.");
+    } catch {
+      alert("상태 변경에 실패했습니다.");
+    }
+  };
+
+  // 본인 확인 인증 처리
+  const handleVerifySubmit = async (inputAnswer) => {
+    try {
+      const res = await api.post(`/api/items/${itemId}/verify`, { answer: inputAnswer });
+      if (!res.data) {
+        alert("정답이 일치하지 않습니다. 다시 시도해주세요.");
+        return;
+      }
+
+      alert("본인 확인에 성공했습니다. 이제 작성자와 채팅을 나눌 수 있습니다.");
+      setIsVerified(true);
+      localStorage.setItem(`verified_item_${itemId}`, 'true');
+      setIsVerifyOpen(false);
+    } catch {
+      alert("본인 확인 처리에 실패했습니다.");
+    }
+  };
+
+  // 채팅방 진입 핸들러
+  const handleChatClick = async () => {
+    if (!checkLogin()) return; 
+    if (isMyPost) return; 
+    if (!isLost && !isVerified) return alert("습득물은 먼저 본인 확인을 완료해야 채팅을 시작할 수 있습니다.");
+    if (!postData.writerId) return alert("작성자 정보를 확인할 수 없어 채팅을 시작할 수 없습니다.");
+
+    try {
+      const roomRes = await api.post('/api/chat-rooms', { userId: postData.writerId });
+      onNavigate('chat-room', { post: postData, room: roomRes.data });
+    } catch {
+      alert("채팅방 생성에 실패했습니다.");
+    }
+  };
 
   return (
-    <div style={styles.container}>
-      
-      {/* 1. 상단: 뒤로가기 버튼 & 신고하기 버튼 */}
-      <div style={styles.topBar}>
-        <button 
-          onClick={() => onNavigate && onNavigate(isLost ? 'lost-list' : 'found-list')} 
-          style={styles.backBtn}
-        >
+    <div style={styles.page}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <button style={styles.backButton} onClick={() => onNavigate(isLost ? 'lost-list' : 'found-list')}>
           ← 목록으로 돌아가기
         </button>
-        
-        <button 
-          onClick={() => setIsReportOpen(true)}
-          style={styles.reportPostBtn}
-        >
-          🚨 게시글 신고
-        </button>
-      </div>
 
-      {/* 2. 물품 이미지 */}
-      <div style={styles.imageContainer}>
-        <img 
-          src={postData.image || 'https://via.placeholder.com/600x400?text=No+Image'} 
-          alt={postData.title} 
-          style={styles.image} 
-        />
-      </div>
-
-      {/* 3. 게시글 정보 */}
-      <div style={styles.headerSection}>
-        <div style={styles.badgeGroup}>
-          <span style={{ ...styles.badge, backgroundColor: typeBgColor }}>
-            {typeLabel}
-          </span>
-          <span style={styles.statusBadge}>
-            {postData.status === 'FINDING' ? '찾는 중' : postData.status === 'KEEPING' ? '보관 중' : '완료'}
-          </span>
-          <span style={styles.categoryTag}>{postData.category}</span>
-        </div>
-
-        <h1 style={styles.title}>{postData.title}</h1>
-
-        <div style={styles.metaInfo}>
-          <div>
-            <strong>작성자:</strong> {postData.author || '익명'} 
-            <span style={styles.tempSpan}>🔥 {postData.trustTemp || 36.5}°C</span>
+        {isMyPost && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {postData.status !== 'RESOLVED' ? (
+              <button style={styles.resolveBtn} onClick={() => setIsReviewOpen(true)}>✅ 완료 처리</button>
+            ) : (
+              <button style={styles.cancelBtn} onClick={handleCancelResolve}>↩️ 완료 취소</button>
+            )}
+            <button style={styles.editBtn} onClick={handleEdit}>수정</button>
+            <button style={styles.deleteBtn} onClick={handleDelete}>삭제</button>
           </div>
-          <div>📅 {postData.date}</div>
-        </div>
-      </div>
-
-      {/* 4. 상세 설명 */}
-      <div style={styles.detailSection}>
-        <div style={styles.infoRow}>
-          <span style={styles.infoLabel}>{isLost ? '분실 장소:' : '습득 장소:'}</span>
-          <span style={styles.infoValue}>{postData.location}</span>
-        </div>
-        
-        <div style={styles.descBox}>
-          <p style={styles.descText}>{postData.description}</p>
-        </div>
-      </div>
-
-      {/* 5. 최하단: 액션 버튼 그룹 */}
-      <div style={styles.actionSection}>
-        {isLost ? (
-          <button 
-            style={{ ...styles.actionBtn, backgroundColor: '#8b5cf6' }}
-            onClick={() => alert('유사 습득물을 매칭 중입니다...')}
-          >
-            유사 습득물 찾기
-          </button>
-        ) : (
-          /* 💡 습득물인 경우 : 본인 확인 질문 답변 버튼 */
-          <button 
-            style={{ 
-              ...styles.actionBtn, 
-              backgroundColor: isVerified ? '#059669' : '#2563eb' 
-            }}
-            onClick={() => setIsVerifyOpen(true)}
-          >
-            {isVerified ? '✅ 본인 확인 완료' : '❓ 본인 확인 질문 답변하기'}
-          </button>
         )}
-
-        {/* 💡 채팅하기 버튼 (비활성화 상태 및 호버 안내 툴팁 적용) */}
-        <button 
-          disabled={!canChat}
-          title={!canChat ? "본인 확인 질문을 답변해야 활성화됩니다." : "작성자와 1:1 채팅하기"}
-          style={{ 
-            ...styles.actionBtn, 
-            backgroundColor: canChat ? '#1f2937' : '#9ca3af',
-            cursor: canChat ? 'pointer' : 'not-allowed',
-            opacity: canChat ? 1 : 0.7
-          }}
-          onClick={() => canChat && onNavigate && onNavigate('chat-room', postData)}
-        >
-          💬 채팅하기
-        </button>
       </div>
 
-      {/* 💡 신고하기 모달 */}
-      <ReportModal
-        isOpen={isReportOpen}
-        onClose={() => setIsReportOpen(false)}
-        targetType="게시글"
-        targetTitle={postData.title}
+      <div style={styles.contentWrapper}>
+        <div style={styles.imageSection}>
+          <img src={postData.imageUrl || "https://via.placeholder.com/600x400?text=No+Image"} alt="물품" style={styles.mainImage} />
+        </div>
+
+        <div style={styles.infoSection}>
+          <div style={styles.badgeGroup}>
+            <span style={{ ...styles.badge, backgroundColor: typeBgColor }}>{typeLabel}</span>
+            <span style={styles.statusBadge}>{postData.status === 'RESOLVED' ? '완료' : '진행중'}</span>
+            <span style={styles.categoryTag}>{postData.categoryName || '기타'}</span>
+          </div>
+
+          <h1 style={styles.title}>{postData.title}</h1>
+          
+          <div style={styles.metaInfo}>
+            <span 
+              style={{ cursor: 'pointer', color: '#ef4444', textDecoration: 'underline' }} 
+              onClick={() => {
+                if (checkLogin()) setIsReportOpen(true);
+              }}
+            >
+              신고하기
+            </span>
+          </div>
+
+          <div style={styles.detailBox}>
+            <p style={styles.infoRow}><strong style={styles.infoLabel}>장소:</strong> {postData.location}</p>
+            <p style={styles.infoRow}><strong style={styles.infoLabel}>일시:</strong> {postData.eventDate ? postData.eventDate.replace('T', ' ') : '날짜 미상'}</p>
+          </div>
+
+          <div style={styles.descBox}>
+            <h3 style={{ marginTop: 0, fontSize: '16px' }}>상세 설명</h3>
+            <p style={{ lineHeight: '1.6', color: '#4b5563', margin: 0, whiteSpace: 'pre-wrap' }}>{postData.content}</p>
+          </div>
+
+          <div style={styles.actionGroup}>
+            {isLost ? (
+              <button 
+                style={{ 
+                  ...styles.actionBtn, 
+                  backgroundColor: isMyPost ? '#111827' : '#f3f4f6', 
+                  color: isMyPost ? '#ffffff' : '#9ca3af',
+                  cursor: isMyPost ? 'pointer' : 'not-allowed'
+                }} 
+                onClick={() => {
+                  if (!isMyPost) return;
+                  setIsSimilarModalOpen(true);
+                }}
+                disabled={!isMyPost}
+              >
+                {isMyPost ? '유사 습득물 찾기' : '유사 습득물 찾기 (작성자 전용)'}
+              </button>
+            ) : (
+              <button 
+                style={{
+                  ...styles.actionBtn, 
+                  backgroundColor: isMyPost ? '#f3f4f6' : (isVerified ? '#10b981' : '#2563eb'), 
+                  color: isMyPost ? '#9ca3af' : '#ffffff',
+                  cursor: isMyPost ? 'not-allowed' : 'pointer'
+                }} 
+                onClick={() => { 
+                  if (isMyPost) return;
+                  if (!checkLogin()) return;
+                  if (isVerified) { 
+                    alert("이미 본인 확인이 완료되었습니다."); 
+                  } else { 
+                    setIsVerifyOpen(true); 
+                  } 
+                }}
+                disabled={isMyPost}
+              >
+                {isMyPost ? '본인 확인 (작성자)' : (isVerified ? '✅본인 확인 완료' : '본인 확인 질문 답하기')}
+              </button>
+            )}
+
+            {isMyPost ? (
+              <button style={{ ...styles.actionBtn, backgroundColor: '#f3f4f6', color: '#9ca3af', cursor: 'not-allowed' }}>
+                내가 작성한 게시글입니다
+              </button>
+            ) : (
+              <button 
+                style={{ 
+                  ...styles.actionBtn, 
+                  backgroundColor: (!isLost && !isVerified) ? '#e5e7eb' : '#2563eb', 
+                  color: (!isLost && !isVerified) ? '#9ca3af' : '#ffffff', 
+                  cursor: (!isLost && !isVerified) ? 'not-allowed' : 'pointer' 
+                }} 
+                onClick={handleChatClick}
+              >
+                💬 작성자와 채팅하기
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetType="ITEM" targetTitle={postData.title} targetId={postData.id} />
+      
+      {isVerifyOpen && (
+        <VerifyModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} question={postData.question || '본인 확인 질문이 등록되지 않았습니다.'} onVerify={handleVerifySubmit} />
+      )}
+      
+      <SimilarItemsModal 
+        isOpen={isSimilarModalOpen} 
+        onClose={() => setIsSimilarModalOpen(false)} 
+        baseItemTitle={postData.title}
+        baseItemCategoryId={postData.categoryId} 
+        onNavigate={onNavigate}
       />
 
-      {/* 💡 본인 확인 질문 모달 */}
-      <VerifyModal
-        isOpen={isVerifyOpen}
-        onClose={() => setIsVerifyOpen(false)}
-        question={postData.question}
-        onSuccess={() => setIsVerified(true)}
+      <ReviewModal 
+        isOpen={isReviewOpen} 
+        onClose={() => setIsReviewOpen(false)} 
+        onResolve={handleResolve}
+        currentUserId={currentUser?.id}
       />
     </div>
   );
 }
 
 const styles = {
-  container: { maxWidth: '800px', margin: '0 auto', padding: '30px 20px', fontFamily: "'Pretendard', sans-serif" },
-  topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  backBtn: { backgroundColor: 'transparent', border: 'none', color: '#4b5563', fontSize: '15px', cursor: 'pointer', fontWeight: 'bold' },
-  reportPostBtn: { backgroundColor: '#fff5f5', color: '#e53e3e', border: '1px solid #fed7d7', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' },
-  imageContainer: { width: '100%', height: '380px', backgroundColor: '#f3f4f6', borderRadius: '14px', overflow: 'hidden', marginBottom: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-  image: { width: '100%', height: '100%', objectFit: 'cover' },
-  headerSection: { paddingBottom: '20px', borderBottom: '1px solid #e5e7eb' },
-  badgeGroup: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px' },
-  badge: { color: '#fff', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' },
-  statusBadge: { backgroundColor: '#e5e7eb', color: '#374151', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' },
+  page: { maxWidth: '1000px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
+  backButton: { background: 'none', border: 'none', color: '#4b5563', fontSize: '15px', cursor: 'pointer', padding: 0, fontWeight: 'bold' },
+  resolveBtn: { padding: '6px 14px', backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
+  cancelBtn: { padding: '6px 14px', backgroundColor: '#6b7280', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
+  editBtn: { padding: '6px 14px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
+  deleteBtn: { padding: '6px 14px', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
+  contentWrapper: { display: 'flex', gap: '40px', backgroundColor: '#fff', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },
+  imageSection: { flex: '1', minWidth: '300px' },
+  mainImage: { width: '100%', height: '100%', objectFit: 'cover', borderRadius: '12px', maxHeight: '400px', backgroundColor: '#f3f4f6' },
+  infoSection: { flex: '1', display: 'flex', flexDirection: 'column' },
+  badgeGroup: { display: 'flex', gap: '8px', marginBottom: '12px' },
+  badge: { padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold', color: '#fff' },
+  statusBadge: { backgroundColor: '#f3f4f6', color: '#374151', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' },
   categoryTag: { backgroundColor: '#eff6ff', color: '#2563eb', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' },
-  title: { fontSize: '26px', fontWeight: 'bold', color: '#111827', margin: '0 0 16px 0' },
-  metaInfo: { display: 'flex', justifyContent: 'space-between', color: '#6b7280', fontSize: '14px' },
-  tempSpan: { color: '#f97316', marginLeft: '6px' },
-  detailSection: { padding: '24px 0', borderBottom: '1px solid #e5e7eb' },
-  infoRow: { fontSize: '16px', color: '#1f2937', marginBottom: '16px' },
-  infoLabel: { fontWeight: 'bold', marginRight: '8px' },
-  infoValue: { color: '#374151' },
-  descBox: { backgroundColor: '#f9fafb', padding: '16px', borderRadius: '10px', border: '1px solid #f3f4f6' },
-  descText: { fontSize: '15px', color: '#374151', lineHeight: '1.6', margin: 0, whiteSpace: 'pre-wrap' },
-  actionSection: { display: 'flex', gap: '14px', marginTop: '28px' },
-  actionBtn: { flex: 1, padding: '16px', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: 'bold', transition: 'all 0.2s ease' },
+  title: { fontSize: '28px', fontWeight: 'bold', color: '#111827', margin: '0 0 16px 0' },
+  metaInfo: { display: 'flex', justifyContent: 'flex-end', fontSize: '14px', color: '#6b7280', paddingBottom: '20px', borderBottom: '1px solid #e5e7eb', marginBottom: '20px' },
+  detailBox: { marginBottom: '24px' },
+  infoRow: { margin: '0 0 12px 0', fontSize: '15px', color: '#111827' },
+  infoLabel: { color: '#6b7280', display: 'inline-block', width: '50px' },
+  descBox: { backgroundColor: '#f9fafb', padding: '20px', borderRadius: '12px', marginBottom: '30px', flex: 1 },
+  actionGroup: { display: 'flex', gap: '12px', marginTop: 'auto' },
+  actionBtn: { flex: 1, padding: '16px', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center' }
 };

@@ -1,7 +1,7 @@
 package findu.backend.auth.handler;
 
-import findu.backend.auth.dto.TokenResponse;
-import findu.backend.auth.service.AuthService;
+import findu.backend.security.jwt.JwtTokenProvider;
+import findu.backend.user.entity.Role;
 import findu.backend.user.entity.User;
 import findu.backend.user.repository.UserRepository;
 import jakarta.servlet.ServletException;
@@ -18,16 +18,17 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
+// OAuth2 로그인 성공 시 사용자 정보를 처리하고 토큰을 발급하여 프론트엔드로 리다이렉트하는 핸들러
 @Component
 @RequiredArgsConstructor
-public class OAuth2LoginSuccessHandler
-        extends SimpleUrlAuthenticationSuccessHandler {
+public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final UserRepository userRepository;
+    
+    // AuthService 대신 JwtTokenProvider를 직접 주입받아 사용합니다.
+    private final JwtTokenProvider jwtTokenProvider;
 
-    private final AuthService authService;
-
-    @Value("${app.frontend-url}")
+    @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
     @Override
@@ -37,70 +38,42 @@ public class OAuth2LoginSuccessHandler
             Authentication authentication
     ) throws IOException, ServletException {
 
-        /*
-         * Google에서 인증된 사용자 정보 가져오기
-         */
-        OAuth2User oauthUser =
-                (OAuth2User) authentication.getPrincipal();
+        // 인증 객체에서 사용자 정보 추출
+        OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
+        String email = oauthUser.getAttribute("email");
+        String name = oauthUser.getAttribute("name");
+        String picture = oauthUser.getAttribute("picture");
 
-        String email =
-                oauthUser.getAttribute("email");
+        if (email == null) {
+            throw new IllegalStateException("구글 계정에서 이메일 정보를 가져올 수 없습니다.");
+        }
 
-        /*
-         * DB에서 사용자 조회
-         */
-        User user =
-                userRepository.findByEmail(email)
-                        .orElseThrow(() ->
-                                new IllegalStateException(
-                                        "사용자를 찾을 수 없습니다."
-                                )
-                        );
+        // 닉네임 생성 (이름이 없을 경우 이메일 앞자리 사용)
+        String nickname = (name != null && !name.isBlank()) ? name : email.split("@")[0];
 
-        /*
-         * JWT 발급
-         */
-        TokenResponse tokens =
-                authService.issueTokens(
-                        user.getId()
-                );
+        // 사용자 조회 및 신규 가입 처리
+        User user = userRepository.findByEmail(email)
+                .orElseGet(() -> userRepository.save(
+                        User.builder()
+                                .email(email)
+                                .nickname(nickname)
+                                .profileImage(picture)
+                                .trustScore(36)
+                                .role(Role.USER)
+                                .build()
+                ));
 
-        /*
-         * React OAuth Callback 주소 생성
-         *
-         * 예:
-         *
-         * http://localhost:5173/auth/callback
-         * ?accessToken=...
-         * &refreshToken=...
-         * &userId=1
-         * &email=...
-         */
-        String redirectUrl =
-                frontendUrl
-                        + "/auth/callback"
-                        + "?accessToken="
-                        + URLEncoder.encode(
-                        tokens.getAccessToken(),
-                        StandardCharsets.UTF_8
-                )
-                        + "&refreshToken="
-                        + URLEncoder.encode(
-                        tokens.getRefreshToken(),
-                        StandardCharsets.UTF_8
-                )
-                        + "&userId="
-                        + user.getId()
-                        + "&email="
-                        + URLEncoder.encode(
-                        user.getEmail(),
-                        StandardCharsets.UTF_8
-                );
-        System.out.println("OAuth redirectUrl = " + redirectUrl);
-        getRedirectStrategy().sendRedirect(
-                request,
-                response,
-                redirectUrl
-        );
+        // JWT 토큰 직접 생성 (Access Token 및 Refresh Token)
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+
+        // 프론트엔드 콜백 URL 생성 및 리다이렉트
+        String redirectUrl = frontendUrl + "/auth/callback"
+                + "?accessToken=" + URLEncoder.encode(accessToken, StandardCharsets.UTF_8)
+                + "&refreshToken=" + URLEncoder.encode(refreshToken, StandardCharsets.UTF_8)
+                + "&userId=" + user.getId()
+                + "&email=" + URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8);
+
+        getRedirectStrategy().sendRedirect(request, response, redirectUrl);
     }
 }
