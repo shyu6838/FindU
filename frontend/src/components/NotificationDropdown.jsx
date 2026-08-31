@@ -1,24 +1,75 @@
 // NotificationDropdown.jsx
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Client } from '@stomp/stompjs';
 import api from '../api/axios';
 
 // 네비게이션바 알림 드롭다운 컴포넌트
 export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [toast, setToast] = useState(null);
   const dropdownRef = useRef(null);
+  const toastTimerRef = useRef(null);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      const res = await api.get('/api/notifications');
+      setNotifications(res.data || []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const showToast = useCallback((notification) => {
+    setToast(notification);
+    window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 4000);
+  }, []);
 
   useEffect(() => {
     if (!isLoggedIn) {
       setNotifications([]);
+      setToast(null);
       return;
     }
 
-    api.get('/api/notifications')
-      .then(res => setNotifications(res.data || []))
-      .catch(() => setNotifications([]));
-  }, [isLoggedIn]);
+    fetchNotifications();
+
+    const accessToken = localStorage.getItem('accessToken');
+    const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
+    const websocketUrl = `${apiUrl.replace(/^http/, 'ws')}/ws/chat`;
+    const client = new Client({
+      brokerURL: websocketUrl,
+      connectHeaders: { Authorization: `Bearer ${accessToken}` },
+      reconnectDelay: 5000,
+      heartbeatIncoming: 10000,
+      heartbeatOutgoing: 10000,
+      debug: () => {},
+      onConnect: () => {
+        fetchNotifications();
+        client.subscribe('/user/queue/notifications', (message) => {
+          const notification = JSON.parse(message.body);
+          setNotifications((prev) => [
+            notification,
+            ...prev.filter((item) => item.id !== notification.id),
+          ]);
+          showToast(notification);
+        });
+      },
+    });
+
+    client.activate();
+
+    return () => {
+      window.clearTimeout(toastTimerRef.current);
+      client.deactivate();
+    };
+  }, [fetchNotifications, isLoggedIn, showToast]);
 
   // 드롭다운 외부 영역 클릭 시 닫기
   useEffect(() => {
@@ -31,7 +82,8 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const hasUnread = notifications.some(noti => !noti.read);
+  const unreadCount = notifications.filter(noti => !noti.read).length;
+  const hasUnread = unreadCount > 0;
 
   // 알림 토글 핸들러
   const handleToggle = () => {
@@ -60,7 +112,12 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   };
 
   const handleReadAll = async () => {
-    await Promise.all(notifications.filter(noti => !noti.read).map(handleRead));
+    try {
+      await api.patch('/api/notifications/read-all');
+      setNotifications(prev => prev.map(item => ({ ...item, read: true })));
+    } catch {
+      alert('모두 읽음 처리에 실패했습니다.');
+    }
   };
 
   return (
@@ -70,14 +127,14 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
         onClick={handleToggle}
       >
         알림
-        {isLoggedIn && hasUnread && <span style={redDotStyle}></span>}
+        {isLoggedIn && hasUnread && <span style={badgeStyle}>{unreadCount}</span>}
       </div>
 
       {isOpen && (
         <div style={dropdownStyle}>
           <div style={headerStyle}>
             <h4 style={headerTitleStyle}>알림</h4>
-            <button style={readAllBtnStyle} onClick={handleReadAll}>
+            <button style={readAllBtnStyle} onClick={handleReadAll} disabled={!hasUnread}>
               모두 읽음
             </button>
           </div>
@@ -100,7 +157,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
                 }}
               >
                 <div style={iconBoxStyle}>
-                  {noti.type === 'CHAT' ? '💬' : noti.type === 'MATCH' ? '🚨' : '❓'}
+                  {noti.type === 'CHAT' ? '💬' : noti.type === 'CHAT_MATCHED' ? '✅' : noti.type === 'MATCH' ? '🚨' : '❓'}
                 </div>
                 <div style={contentStyle}>
                   <p style={messageStyle}>{noti.message}</p>
@@ -109,7 +166,21 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
               </li>
             ))}
           </ul>
+          {isRefreshing && <div style={refreshingStyle}>알림을 불러오는 중...</div>}
         </div>
+      )}
+      {toast && (
+        <button
+          type="button"
+          style={toastStyle}
+          onClick={() => {
+            setIsOpen(true);
+            setToast(null);
+          }}
+        >
+          <span style={toastIconStyle}>{toast.type === 'CHAT' ? '💬' : '✅'}</span>
+          <span style={toastMessageStyle}>{toast.message}</span>
+        </button>
       )}
     </div>
   );
@@ -118,7 +189,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
 // 스타일 설정
 const containerStyle = { position: 'relative', display: 'inline-block', marginLeft: '24px' };
 const navItemStyle = { cursor: 'pointer', fontWeight: '500', color: '#374151', fontSize: '15px', display: 'flex', alignItems: 'center', position: 'relative' };
-const redDotStyle = { position: 'absolute', top: '-2px', right: '-6px', width: '6px', height: '6px', backgroundColor: '#ef4444', borderRadius: '50%' };
+const badgeStyle = { position: 'absolute', top: '-10px', right: '-16px', minWidth: '18px', height: '18px', padding: '0 5px', backgroundColor: '#ef4444', color: '#ffffff', borderRadius: '999px', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' };
 const dropdownStyle = { position: 'absolute', top: '35px', right: '-10px', width: '320px', backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)', border: '1px solid #e5e7eb', zIndex: 1000, overflow: 'hidden' };
 const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #f3f4f6', backgroundColor: '#ffffff' };
 const headerTitleStyle = { margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#111827' };
@@ -129,3 +200,7 @@ const iconBoxStyle = { fontSize: '18px', marginRight: '12px', marginTop: '2px' }
 const contentStyle = { flex: 1 };
 const messageStyle = { margin: '0 0 4px 0', fontSize: '14px', color: '#374151', lineHeight: '1.4', wordBreak: 'keep-all' };
 const timeStyle = { fontSize: '11px', color: '#9ca3af' };
+const refreshingStyle = { padding: '8px 16px', fontSize: '11px', color: '#9ca3af', textAlign: 'center', borderTop: '1px solid #f3f4f6' };
+const toastStyle = { position: 'fixed', top: '72px', right: '24px', width: 'min(360px, calc(100vw - 32px))', display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', backgroundColor: '#ffffff', color: '#1f2937', border: '1px solid #bfdbfe', borderLeft: '4px solid #2563eb', borderRadius: '8px', boxShadow: '0 12px 24px rgba(15, 23, 42, 0.16)', cursor: 'pointer', textAlign: 'left', zIndex: 1100, fontFamily: 'inherit' };
+const toastIconStyle = { flex: '0 0 auto', fontSize: '18px' };
+const toastMessageStyle = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '14px', fontWeight: '600' };

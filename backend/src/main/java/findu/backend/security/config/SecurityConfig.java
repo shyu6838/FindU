@@ -45,6 +45,7 @@ public class SecurityConfig {
                                 "/login/**",
                                 "/oauth2/**",
                                 "/oauth/callback",
+                                "/ws/**",
                                 "/api/categories/**",
                                 "/api/items/**",
                                 "/api/auth/reissue",

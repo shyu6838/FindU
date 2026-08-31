@@ -3,6 +3,7 @@ package findu.backend.chat.service;
 import findu.backend.chat.dto.*;
 import findu.backend.chat.entity.*;
 import findu.backend.chat.repository.*;
+import findu.backend.notification.service.NotificationService;
 import findu.backend.user.entity.User;
 import findu.backend.user.repository.UserRepository;
 import findu.backend.chat.dto.ChatMessageRequest;
@@ -20,6 +21,7 @@ public class ChatService {
     private final ChatRoomRepository rooms;
     private final ChatMessageRepository msgs;
     private final UserRepository users;
+    private final NotificationService notificationService;
 
     private User u(Long id) {
         return users.findById(id)
@@ -105,9 +107,21 @@ public class ChatService {
                 .user2(user2)
                 .build();
 
-        return ChatRoomResponse.from(
-                rooms.save(chatRoom)
+        ChatRoom savedRoom = rooms.save(chatRoom);
+
+        notificationService.create(
+                user1.getId(),
+                "CHAT_MATCHED",
+                user2.getNickname() + "님과 채팅이 매칭되었습니다."
         );
+
+        notificationService.create(
+                user2.getId(),
+                "CHAT_MATCHED",
+                user1.getNickname() + "님과 채팅이 매칭되었습니다."
+        );
+
+        return ChatRoomResponse.from(savedRoom);
     }
 
     /**
@@ -147,9 +161,10 @@ public class ChatService {
                 .content(r.content())
                 .build();
 
-        return ChatMessageResponse.from(
-                msgs.save(message)
-        );
+        ChatMessage savedMessage = msgs.save(message);
+        notifyNewMessage(room, uid);
+
+        return ChatMessageResponse.from(savedMessage);
     }
 
     @Transactional
@@ -169,8 +184,24 @@ public class ChatService {
                 .content(r.content())
                 .build();
 
-        return ChatMessageResponse.from(
-                msgs.save(message)
+        ChatMessage savedMessage = msgs.save(message);
+        notifyNewMessage(chatRoom, uid);
+
+        return ChatMessageResponse.from(savedMessage);
+    }
+
+    private void notifyNewMessage(ChatRoom room, Long senderId) {
+        User sender = room.getUser1().getId().equals(senderId)
+                ? room.getUser1()
+                : room.getUser2();
+        User receiver = room.getUser1().getId().equals(senderId)
+                ? room.getUser2()
+                : room.getUser1();
+
+        notificationService.create(
+                receiver.getId(),
+                "CHAT",
+                sender.getNickname() + "님에게서 새로운 메시지가 도착하였습니다."
         );
     }
 

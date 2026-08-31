@@ -19,7 +19,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void configureMessageBroker(MessageBrokerRegistry config) {
 
         // 서버 → 클라이언트
-        config.enableSimpleBroker("/sub");
+        config.enableSimpleBroker("/sub", "/queue");
+
+        // 로그인한 사용자만 자신의 알림 채널을 구독할 수 있도록 사용한다.
+        config.setUserDestinationPrefix("/user");
 
         // 클라이언트 → 서버
         config.setApplicationDestinationPrefixes("/pub");

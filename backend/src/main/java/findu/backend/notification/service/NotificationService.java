@@ -6,6 +6,7 @@ import findu.backend.notification.repository.NotificationRepository;
 import findu.backend.user.entity.User;
 import findu.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ public class NotificationService {
 
     private final NotificationRepository repo;
     private final UserRepository users;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> list(Long uid) {
@@ -40,6 +42,12 @@ public class NotificationService {
         x.markRead();
     }
 
+    @Transactional
+    public void readAll(Long uid) {
+        repo.findByUserIdAndReadFalse(uid)
+                .forEach(Notification::markRead);
+    }
+
     // 알림 생성
     @Transactional
     public void create(Long userId, String type, String message) {
@@ -54,6 +62,12 @@ public class NotificationService {
                 .message(message)
                 .build();
 
-        repo.save(notification);
+        Notification savedNotification = repo.save(notification);
+
+        messagingTemplate.convertAndSendToUser(
+                userId.toString(),
+                "/queue/notifications",
+                NotificationResponse.from(savedNotification)
+        );
     }
 }
