@@ -1,5 +1,3 @@
-// NotificationDropdown.jsx
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import api from '../api/axios';
@@ -16,9 +14,10 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const fetchNotifications = useCallback(async () => {
     try {
       setIsRefreshing(true);
-      const res = await api.get('/api/notifications');
+      const res = await api.get('/api/notifications', { timeout: 5000 });
       setNotifications(res.data || []);
-    } catch {
+    } catch (error) {
+      console.error('알림 로딩 실패:', error);
       setNotifications([]);
     } finally {
       setIsRefreshing(false);
@@ -43,6 +42,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     const accessToken = localStorage.getItem('accessToken');
     const apiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8080').replace(/\/$/, '');
     const websocketUrl = `${apiUrl.replace(/^http/, 'ws')}/ws/chat`;
+    
     const client = new Client({
       brokerURL: websocketUrl,
       connectHeaders: { Authorization: `Bearer ${accessToken}` },
@@ -71,7 +71,6 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     };
   }, [fetchNotifications, isLoggedIn, showToast]);
 
-  // 드롭다운 외부 영역 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -85,7 +84,6 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const unreadCount = notifications.filter(noti => !noti.read).length;
   const hasUnread = unreadCount > 0;
 
-  // 알림 토글 핸들러
   const handleToggle = () => {
     if (!isLoggedIn) {
       alert("로그인이 필요한 서비스입니다.");
@@ -115,7 +113,6 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     try {
       await api.patch('/api/notifications/read-all');
       setNotifications(prev => prev.map(item => ({ ...item, read: true })));
-      await fetchNotifications();
     } catch {
       alert('모두 읽음 처리에 실패했습니다.');
     }
@@ -135,20 +132,24 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
         <div style={dropdownStyle}>
           <div style={headerStyle}>
             <h4 style={headerTitleStyle}>알림</h4>
-            <button style={readAllBtnStyle} onClick={handleReadAll} disabled={!hasUnread}>
-              모두 읽음
-            </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button style={actionBtnStyle} onClick={handleReadAll} disabled={!hasUnread}>
+                모두 읽음
+              </button>
+            </div>
           </div>
 
           <ul style={listStyle}>
             {notifications.length === 0 ? (
-              <li style={{ ...listItemStyle, cursor: 'default', color: '#9ca3af' }}>새 알림이 없습니다.</li>
+              <li style={{ ...listItemStyle, cursor: 'default', color: '#9ca3af', justifyContent: 'center' }}>새 알림이 없습니다.</li>
             ) : notifications.map((noti) => (
               <li 
                 key={noti.id} 
                 style={{
                   ...listItemStyle,
-                  backgroundColor: noti.read ? '#ffffff' : '#eff6ff'
+                  backgroundColor: noti.read ? '#f3f4f6' : '#eff6ff',
+                  color: noti.read ? '#9ca3af' : '#374151',
+                  opacity: noti.read ? 0.7 : 1
                 }}
                 onClick={async () => {
                   await handleRead(noti);
@@ -164,11 +165,11 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
                   }
                 }}
               >
-                <div style={iconBoxStyle}>
+                <div style={{ ...iconBoxStyle, filter: noti.read ? 'grayscale(100%)' : 'none' }}>
                   {noti.type === 'CHAT' ? '💬' : noti.type === 'CHAT_MATCHED' ? '✅' : noti.type === 'MATCH' ? '🚨' : '❓'}
                 </div>
                 <div style={contentStyle}>
-                  <p style={messageStyle}>{noti.message}</p>
+                  <p style={{ ...messageStyle, color: noti.read ? '#6b7280' : '#374151' }}>{noti.message}</p>
                   <span style={timeStyle}>{formatTime(noti.createdAt)}</span>
                 </div>
               </li>
@@ -201,12 +202,12 @@ const badgeStyle = { position: 'absolute', top: '-10px', right: '-16px', minWidt
 const dropdownStyle = { position: 'absolute', top: '35px', right: '-10px', width: '320px', backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)', border: '1px solid #e5e7eb', zIndex: 1000, overflow: 'hidden' };
 const headerStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #f3f4f6', backgroundColor: '#ffffff' };
 const headerTitleStyle = { margin: 0, fontSize: '15px', fontWeight: 'bold', color: '#111827' };
-const readAllBtnStyle = { background: 'none', border: 'none', fontSize: '12px', color: '#6b7280', cursor: 'pointer', padding: 0 };
+const actionBtnStyle = { background: 'none', border: 'none', fontSize: '12px', color: '#6b7280', cursor: 'pointer', padding: 0, fontWeight: '500' };
 const listStyle = { listStyle: 'none', margin: 0, padding: 0, maxHeight: '360px', overflowY: 'auto' };
 const listItemStyle = { display: 'flex', alignItems: 'flex-start', padding: '14px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', transition: 'background-color 0.2s' };
 const iconBoxStyle = { fontSize: '18px', marginRight: '12px', marginTop: '2px' };
 const contentStyle = { flex: 1 };
-const messageStyle = { margin: '0 0 4px 0', fontSize: '14px', color: '#374151', lineHeight: '1.4', wordBreak: 'keep-all' };
+const messageStyle = { margin: '0 0 4px 0', fontSize: '14px', lineHeight: '1.4', wordBreak: 'keep-all' };
 const timeStyle = { fontSize: '11px', color: '#9ca3af' };
 const refreshingStyle = { padding: '8px 16px', fontSize: '11px', color: '#9ca3af', textAlign: 'center', borderTop: '1px solid #f3f4f6' };
 const toastStyle = { position: 'fixed', top: '72px', right: '24px', width: 'min(360px, calc(100vw - 32px))', display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', backgroundColor: '#ffffff', color: '#1f2937', border: '1px solid #bfdbfe', borderLeft: '4px solid #2563eb', borderRadius: '8px', boxShadow: '0 12px 24px rgba(15, 23, 42, 0.16)', cursor: 'pointer', textAlign: 'left', zIndex: 1100, fontFamily: 'inherit' };
