@@ -1,4 +1,4 @@
-package findu.backend.item;
+package findu.backend.item.entitiy;
 
 public enum ItemType {
     LOST,   // 분실물

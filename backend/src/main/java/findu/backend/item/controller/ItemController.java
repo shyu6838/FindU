@@ -1,7 +1,12 @@
 // ItemController.java
 
-package findu.backend.item;
+package findu.backend.item.controller;
 
+import findu.backend.item.dto.ItemRequestDto;
+import findu.backend.item.dto.ItemResponseDto;
+import findu.backend.item.entitiy.ItemStatus;
+import findu.backend.item.entitiy.ItemType;
+import findu.backend.item.service.ItemService;
 import findu.backend.verification.dto.VerificationAnswerRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

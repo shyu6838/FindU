@@ -1,5 +1,8 @@
-package findu.backend.item;
+package findu.backend.item.dto;
 
+import findu.backend.item.entitiy.ItemStatus;
+import findu.backend.item.entitiy.ItemType;
+import findu.backend.item.entitiy.Item;
 import lombok.Builder;
 import lombok.Getter;
 
