@@ -1,7 +1,13 @@
-package findu.backend.item;
+package findu.backend.item.service;
 
 import findu.backend.category.entity.Category;
 import findu.backend.category.repository.CategoryRepository;
+import findu.backend.item.entitiy.ItemStatus;
+import findu.backend.item.entitiy.ItemType;
+import findu.backend.item.dto.ItemRequestDto;
+import findu.backend.item.dto.ItemResponseDto;
+import findu.backend.item.entitiy.Item;
+import findu.backend.item.repository.ItemRepository;
 import findu.backend.user.entity.User;
 import findu.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

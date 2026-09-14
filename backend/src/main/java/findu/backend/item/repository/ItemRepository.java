@@ -1,5 +1,7 @@
-package findu.backend.item;
+package findu.backend.item.repository;
 
+import findu.backend.item.entitiy.ItemType;
+import findu.backend.item.entitiy.Item;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 

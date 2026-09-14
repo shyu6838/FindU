@@ -1,6 +1,6 @@
 // Item.java
 
-package findu.backend.item;
+package findu.backend.item.entitiy;
 
 import findu.backend.category.entity.Category;
 import findu.backend.global.entity.BaseEntity;
@@ -25,7 +25,7 @@ public class Item extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ItemType type; 
+    private ItemType type;
 
     @Column(nullable = false)
     private String title; 
@@ -44,7 +44,7 @@ public class Item extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ItemStatus status; 
+    private ItemStatus status;
 
     // 카테고리 연관관계
     @ManyToOne(fetch = FetchType.LAZY)

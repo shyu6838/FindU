@@ -1,5 +1,6 @@
-package findu.backend.item;
+package findu.backend.item.dto;
 
+import findu.backend.item.entitiy.ItemType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -8,7 +9,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor
 public class ItemRequestDto {
-    private ItemType type;           
+    private ItemType type;
     private String title;            
     private String content;          
     private String location;         
