@@ -1,1 +1,16 @@
-package findu.backend.verification.dto; import findu.backend.verification.entity.VerificationQuestion; public record VerificationQuestionResponse(Long id, String question){public static VerificationQuestionResponse from(VerificationQuestion x){return new VerificationQuestionResponse(x.getId(),x.getQuestion());}}
+package findu.backend.verification.dto;
+
+import findu.backend.verification.entity.VerificationQuestion;
+
+public record VerificationQuestionResponse(
+        Long id,
+        String question
+) {
+
+    public static VerificationQuestionResponse from(VerificationQuestion x) {
+        return new VerificationQuestionResponse(
+                x.getId(),
+                x.getQuestion()
+        );
+    }
+}

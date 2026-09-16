@@ -1,1 +1,26 @@
-package findu.backend.review.dto;import findu.backend.review.entity.Review;public record ReviewResponse(Long id, Long reviewerId, String reviewerNickname, Long revieweeId, int rating, String comment, java.time.LocalDateTime createdAt){public static ReviewResponse from(Review x){return new ReviewResponse(x.getId(),x.getReviewer().getId(),x.getReviewer().getNickname(),x.getReviewee().getId(),x.getRating(),x.getComment(),x.getCreatedAt());}}
+package findu.backend.review.dto;
+
+import findu.backend.review.entity.Review;
+
+public record ReviewResponse(
+        Long id,
+        Long reviewerId,
+        String reviewerNickname,
+        Long revieweeId,
+        int rating,
+        String comment,
+        java.time.LocalDateTime createdAt
+) {
+
+    public static ReviewResponse from(Review x) {
+        return new ReviewResponse(
+                x.getId(),
+                x.getReviewer().getId(),
+                x.getReviewer().getNickname(),
+                x.getReviewee().getId(),
+                x.getRating(),
+                x.getComment(),
+                x.getCreatedAt()
+        );
+    }
+}
