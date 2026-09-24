@@ -1,10 +1,4 @@
-<<<<<<< HEAD:backend/src/main/java/findu/backend/item/Item.java
-package findu.backend.item;
-=======
-// Item.java
-
-package findu.backend.item.entitiy;
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6:backend/src/main/java/findu/backend/item/entitiy/Item.java
+package findu.backend.item.entity;
 
 import findu.backend.category.entity.Category;
 import findu.backend.chat.entity.ChatRoom;

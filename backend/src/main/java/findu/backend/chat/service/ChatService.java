@@ -3,7 +3,7 @@ package findu.backend.chat.service;
 import findu.backend.chat.dto.*;
 import findu.backend.chat.entity.*;
 import findu.backend.chat.repository.*;
-import findu.backend.item.entitiy.Item;
+import findu.backend.item.entity.Item;
 import findu.backend.item.repository.ItemRepository;
 import findu.backend.notification.service.NotificationService;
 import findu.backend.user.entity.User;

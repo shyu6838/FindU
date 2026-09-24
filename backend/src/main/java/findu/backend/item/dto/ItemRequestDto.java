@@ -1,6 +1,6 @@
 package findu.backend.item.dto;
 
-import findu.backend.item.entitiy.ItemType;
+import findu.backend.item.entity.ItemType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
