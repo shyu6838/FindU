@@ -1,7 +1,7 @@
 package findu.backend.chat.entity;
 
 import findu.backend.global.entity.BaseEntity;
-import findu.backend.item.entitiy.Item;
+import findu.backend.item.entity.Item;
 import findu.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;

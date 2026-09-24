@@ -1,8 +1,7 @@
 package findu.backend.report.service;
 
-<<<<<<< HEAD
 import findu.backend.chat.repository.ChatRoomRepository;
-import findu.backend.item.ItemRepository;
+import findu.backend.item.repository.ItemRepository;
 import findu.backend.notification.service.NotificationService;
 import findu.backend.report.dto.*;
 import findu.backend.report.entity.Report;
@@ -19,22 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-=======
-import findu.backend.report.dto.*;
-import findu.backend.report.entity.Report;
-import findu.backend.report.repository.ReportRepository;
-import findu.backend.user.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.*;
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6
 
 @Service
 @RequiredArgsConstructor
 public class ReportService {
-<<<<<<< HEAD
     
     private final ReportRepository repo;
     private final UserRepository users;
@@ -75,63 +62,26 @@ public class ReportService {
 
         Report savedReport = repo.save(report);
         return convertToResponse(savedReport);
-=======
-
-    final ReportRepository repo;
-    final UserRepository users;
-
-    @Transactional
-    public ReportResponse create(Long uid, ReportCreateRequest r) {
-        var u = users.findById(uid)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-
-        return ReportResponse.from(
-                repo.save(
-                        Report.builder()
-                                .reporter(u)
-                                .targetType(r.targetType())
-                                .targetId(r.targetId())
-                                .reason(r.reason())
-                                .description(r.description())
-                                .status(Report.Status.PENDING)
-                                .build()
-                )
-        );
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6
     }
 
     @Transactional(readOnly = true)
     public List<ReportResponse> my(Long uid) {
-<<<<<<< HEAD
         return repo.findByReporterIdOrderByCreatedAtDesc(uid).stream()
                 .map(this::convertToResponse)
-=======
-        return repo.findByReporterIdOrderByCreatedAtDesc(uid)
-                .stream()
-                .map(ReportResponse::from)
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<ReportResponse> all(Long uid) {
         requireAdmin(uid);
-<<<<<<< HEAD
         return repo.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::convertToResponse)
-=======
-
-        return repo.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .map(ReportResponse::from)
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6
                 .toList();
     }
 
     @Transactional
     public ReportResponse status(Long uid, Long id, Report.Status st) {
         requireAdmin(uid);
-<<<<<<< HEAD
         Report r = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("신고를 찾을 수 없습니다."));
         r.updateStatus(st, "상태 임의 변경");
         return convertToResponse(r);
@@ -269,24 +219,5 @@ public class ReportService {
                 report.getSnapshotChatLogs(),
                 report.getCreatedAt()
         );
-=======
-
-        var r = repo.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("신고를 찾을 수 없습니다."));
-
-        r.updateStatus(st);
-
-        return ReportResponse.from(r);
-    }
-
-    private void requireAdmin(Long uid) {
-        var u = users.findById(uid)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-
-        if (u.getRole() != findu.backend.user.entity.Role.ADMIN)
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "관리자만 접근할 수 있습니다."
-            );
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6
     }
 }

@@ -15,7 +15,6 @@ public class Report extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-<<<<<<< HEAD
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -58,29 +57,6 @@ public class Report extends BaseEntity {
 
     @Column(length = 100)
     private String snapshotTargetEmail;
-=======
-    Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "reporter_id")
-    User reporter;
-
-    @Column(nullable = false, length = 30)
-    String targetType;
-
-    @Column(nullable = false)
-    Long targetId;
-
-    @Column(nullable = false, length = 100)
-    String reason;
-
-    @Column(columnDefinition = "TEXT")
-    String description;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    Status status;
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6
 
     public enum Status {
         PENDING,
@@ -88,7 +64,6 @@ public class Report extends BaseEntity {
         REJECTED
     }
 
-<<<<<<< HEAD
     public void updateStatus(Status status, String penaltyDetails) {
         this.status = status;
         this.penaltyDetails = penaltyDetails;
@@ -107,9 +82,5 @@ public class Report extends BaseEntity {
     public void setChatUserInfoSnapshot(String nickname, String email) {
         this.snapshotTargetNickname = nickname;
         this.snapshotTargetEmail = email;
-=======
-    public void updateStatus(Status s) {
-        status = s;
->>>>>>> ac000a47bda31227ea8a335b533fb0ca489933d6
     }
 }

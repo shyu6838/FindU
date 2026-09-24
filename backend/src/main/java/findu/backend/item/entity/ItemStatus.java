@@ -1,4 +1,4 @@
-package findu.backend.item.entitiy;
+package findu.backend.item.entity;
 
 public enum ItemStatus {
     SEARCHING, // 찾는 중 / 보관 중

@@ -4,8 +4,8 @@ package findu.backend.item.controller;
 
 import findu.backend.item.dto.ItemRequestDto;
 import findu.backend.item.dto.ItemResponseDto;
-import findu.backend.item.entitiy.ItemStatus;
-import findu.backend.item.entitiy.ItemType;
+import findu.backend.item.entity.ItemStatus;
+import findu.backend.item.entity.ItemType;
 import findu.backend.item.service.ItemService;
 import findu.backend.verification.dto.VerificationAnswerRequest;
 import lombok.RequiredArgsConstructor;
