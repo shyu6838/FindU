@@ -33,6 +33,5 @@ public class TrustEvent extends BaseEntity {
 
     public enum EventType {
         REVIEW_POSITIVE,
-        REVIEW_NEGATIVE
-    }
+        REVIEW_NEGATIVE    }
 }

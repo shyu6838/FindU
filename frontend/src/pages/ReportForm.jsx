@@ -279,7 +279,7 @@ export default function ReportForm({ setCurrentPage, initialType = 'lost', editD
 // 스타일 속성
 const styles = {
   page: { 
-    maxWidth: '600px', 
+    maxWidth: '800px', 
     margin: '0 auto', 
     padding: '40px 20px', 
     fontFamily: "'Pretendard', sans-serif" 

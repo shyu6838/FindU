@@ -31,6 +31,7 @@ public class UserService {
                 .nickname(user.getNickname())
                 .profileImage(user.getProfileImage())
                 .trustScore(user.getTrustScore())
+                .role(user.getRole().name())
                 .build();
     }
 
@@ -64,6 +65,7 @@ public class UserService {
                 .nickname(user.getNickname())
                 .profileImage(user.getProfileImage())
                 .trustScore(user.getTrustScore())
+                .role(user.getRole().name())
                 .build();
     }
 }

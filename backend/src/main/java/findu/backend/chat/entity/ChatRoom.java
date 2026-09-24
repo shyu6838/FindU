@@ -6,6 +6,9 @@ import findu.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Entity
 @Getter
 @Builder
@@ -26,8 +29,11 @@ public class ChatRoom extends BaseEntity {
     @JoinColumn(name = "user2_id")
     private User user2;
 
-    // 기존 채팅방 데이터는 유지하되, 새 채팅방은 게시글별로 분리한다.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "item_id")
     private Item item;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "room", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<ChatMessage> messages = new ArrayList<>();
 }

@@ -169,7 +169,7 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
 }
 
 const styles = {
-  page: { maxWidth: '1000px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
+  page: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
   header: { marginBottom: '20px' },
   title: { fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: 0 },
   searchBox: { marginBottom: '16px' },

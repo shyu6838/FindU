@@ -16,4 +16,6 @@ public class UserResponseDto {
     private String profileImage;
 
     private Integer trustScore;
+
+    private String role;
 }
