@@ -277,7 +277,7 @@ export default function PostDetail({ itemId, onNavigate }) {
 }
 
 const styles = {
-  page: { maxWidth: '1000px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
+  page: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
   backButton: { background: 'none', border: 'none', color: '#4b5563', fontSize: '15px', cursor: 'pointer', padding: 0, fontWeight: 'bold' },
   resolveBtn: { padding: '6px 14px', backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
   cancelBtn: { padding: '6px 14px', backgroundColor: '#6b7280', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },

@@ -27,7 +27,6 @@ public class Notification extends BaseEntity {
     @Column(nullable = false, length = 500)
     String message;
 
-    // 채팅 알림을 누르면 기존 대화로 이동할 수 있도록 채팅방 ID를 저장한다.
     Long targetId;
 
     @Builder.Default

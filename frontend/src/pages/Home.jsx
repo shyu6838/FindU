@@ -147,7 +147,7 @@ function Home({ requireLogin, changePage }) {
 
 // UI 스타일 정의
 const styles = {
-  container: { padding: '20px', maxWidth: '1000px', margin: '0 auto', color: 'black' },
+  container: { padding: '20px', maxWidth: '1200px', margin: '0 auto', color: 'black' },
   banner: {
     backgroundColor: '#f0f4f8', padding: '40px 20px', borderRadius: '12px',
     textAlign: 'center', marginBottom: '40px'
