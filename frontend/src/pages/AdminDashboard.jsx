@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 
 export default function AdminDashboard({ onNavigate }) {
-  // 탭 및 신고 데이터 상태 관리
+  // 탭 및 데이터 상태 관리
   const [activeTab, setActiveTab] = useState('post');
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
@@ -13,7 +13,7 @@ export default function AdminDashboard({ onNavigate }) {
   const [selectedChatHistory, setSelectedChatHistory] = useState([]);
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
 
-  // 신고 처리 액션(패널티) 상태 관리
+  // 신고 처리 액션 상태 관리
   const [actions, setActions] = useState({
     deletePost: false,
     decreaseTrust: false,
@@ -31,18 +31,25 @@ export default function AdminDashboard({ onNavigate }) {
       const res = await api.get('/api/reports');
       setReports(res.data);
     } catch (err) {
-      // 에러 시 빈 목록 유지
+      // 에러 발생 시 빈 배열 유지
     } finally {
       setLoading(false);
     }
   };
 
+  // 패널티 선택 핸들러
   const handleActionChange = (e) => {
     const { name, checked } = e.target;
     setActions((prev) => ({ ...prev, [name]: checked }));
   };
 
-  // 신고 처리 및 패널티 부여 로직
+  // 모달 닫기 및 상태 초기화
+  const handleCloseModal = () => {
+    setSelectedReport(null);
+    setActions({ deletePost: false, decreaseTrust: false, rejectReport: false });
+  };
+
+  // 신고 처리 제출
   const handleProcessSubmit = async () => {
     if (!actions.deletePost && !actions.decreaseTrust && !actions.rejectReport) {
       alert("처리할 액션을 하나 이상 선택해주세요.");
@@ -54,7 +61,7 @@ export default function AdminDashboard({ onNavigate }) {
       
       const res = await api.patch(`/api/reports/${selectedReport.id}/process`, {
         status: newStatus,
-        deleteTarget: actions.deletePost,
+        deleteTarget: selectedReport.targetType === 'ITEM' ? actions.deletePost : false,
         decreaseTrust: actions.decreaseTrust,
         sendNotification: true
       });
@@ -66,14 +73,13 @@ export default function AdminDashboard({ onNavigate }) {
       ));
       
       alert("신고 처리가 완료되었으며 관련 알림이 발송되었습니다.");
-      setSelectedReport(null);
-      setActions({ deletePost: false, decreaseTrust: false, rejectReport: false });
+      handleCloseModal();
     } catch (err) {
       alert("신고 처리에 실패했습니다.");
     }
   };
 
-  // 채팅 대화 내역 조회 로직 (스냅샷 우선 확인 후 API 호출)
+  // 대화 내역 조회
   const handleOpenChatHistory = async (report) => {
     setIsChatHistoryOpen(true);
     setChatHistoryLoading(true);
@@ -101,7 +107,7 @@ export default function AdminDashboard({ onNavigate }) {
     }
   };
 
-  // 현재 활성화된 탭에 따른 데이터 필터링
+  // 탭 상태에 따른 리포트 필터링
   const filteredReports = activeTab === 'post'
     ? reports.filter(r => r.targetType === 'ITEM' && r.status === 'PENDING')
     : activeTab === 'chat'
@@ -110,7 +116,7 @@ export default function AdminDashboard({ onNavigate }) {
 
   return (
     <div style={styles.container}>
-      {/* 좌측 네비게이션 메뉴 */}
+      {/* 좌측 사이드바 메뉴 */}
       <aside style={styles.sidebar}>
         <h2 style={styles.sidebarTitle}>관리</h2>
         <ul style={styles.menuList}>
@@ -126,7 +132,7 @@ export default function AdminDashboard({ onNavigate }) {
         </ul>
       </aside>
 
-      {/* 메인 콘텐츠 영역 */}
+      {/* 메인 콘텐츠 */}
       <main style={styles.mainContent}>
         <h2 style={styles.contentTitle}>
           {activeTab === 'post' ? '게시글 신고 관리' : activeTab === 'chat' ? '채팅 신고 관리' : '처리 완료 내역'}
@@ -149,7 +155,6 @@ export default function AdminDashboard({ onNavigate }) {
                 <tr><td colSpan="6" style={styles.emptyRow}>데이터를 불러오는 중입니다...</td></tr>
               ) : filteredReports.length > 0 ? (
                 filteredReports.map((report) => {
-                  // 채팅 신고건이면서 삭제(패널티) 처리된 상태인지 확인
                   const isChatDeleted = report.targetType === 'CHAT' && report.status !== 'PENDING' && report.penaltyDetails?.includes('삭제');
 
                   return (
@@ -261,7 +266,7 @@ export default function AdminDashboard({ onNavigate }) {
         </div>
       </main>
 
-      {/* 신고 상세 처리 모달 */}
+      {/* 신고 처리 모달 */}
       {selectedReport && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
@@ -277,10 +282,15 @@ export default function AdminDashboard({ onNavigate }) {
             {selectedReport.status === 'PENDING' && (
               <div style={styles.actionBox}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '15px' }}>패널티 부여 (중복 선택 가능)</h4>
-                <label style={styles.checkboxLabel}>
-                  <input type="checkbox" name="deletePost" checked={actions.deletePost} onChange={handleActionChange} />
-                  대상 게시글 삭제
-                </label>
+                
+                {/* 게시글 신고일 경우에만 게시글 삭제 옵션 렌더링 */}
+                {selectedReport.targetType === 'ITEM' && (
+                  <label style={styles.checkboxLabel}>
+                    <input type="checkbox" name="deletePost" checked={actions.deletePost} onChange={handleActionChange} />
+                    대상 게시글 삭제
+                  </label>
+                )}
+
                 <label style={styles.checkboxLabel}>
                   <input type="checkbox" name="decreaseTrust" checked={actions.decreaseTrust} onChange={handleActionChange} />
                   신고 대상자 신뢰도 5도 하락
@@ -294,7 +304,7 @@ export default function AdminDashboard({ onNavigate }) {
             )}
 
             <div style={styles.modalButtonGroup}>
-              <button style={styles.cancelBtn} onClick={() => setSelectedReport(null)}>닫기</button>
+              <button style={styles.cancelBtn} onClick={handleCloseModal}>닫기</button>
               {selectedReport.status === 'PENDING' && (
                 <button style={styles.submitBtn} onClick={handleProcessSubmit}>처리 완료 적용</button>
               )}
