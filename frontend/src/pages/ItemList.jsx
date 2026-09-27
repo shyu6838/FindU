@@ -34,21 +34,49 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // 데이터 로드
   useEffect(() => {
-    setLoading(true);
+    let active = true;
     const itemType = mode.toUpperCase();
-    
-    api.get(`/api/items?type=${itemType}`)
-      .then(res => {
-        setItems(res.data || []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
-  }, [mode]);
+    const query = searchTerm.trim();
+    const params = new URLSearchParams({ type: itemType });
+
+    if (query) {
+      params.set('query', query);
+      if (selectedCategory !== 'ALL') {
+        params.set('categoryId', selectedCategory);
+      }
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+
+    const timer = window.setTimeout(() => {
+      const url = query
+        ? `/api/items/search?${params.toString()}`
+        : `/api/items?${params.toString()}`;
+
+      api.get(url)
+        .then(res => {
+          if (active) setItems(res.data || []);
+        })
+        .catch(err => {
+          if (!active) return;
+          console.error('게시물 검색 실패', err);
+          setItems([]);
+          setErrorMessage(err.response?.data || '게시물을 불러오지 못했습니다.');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    }, query ? 350 : 0);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [mode, searchTerm, selectedCategory]);
 
   // 카테고리명 추출
   const getCategoryName = (item) => {
@@ -58,19 +86,10 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
     return '기타';
   };
 
-  // 필터링 적용
   const filteredItems = items.filter(item => {
     const itemCategoryName = getCategoryName(item);
-    
-    const matchesCategory = selectedCategory === 'ALL' || 
+    return searchTerm.trim() !== '' || selectedCategory === 'ALL' ||
       itemCategoryName === CATEGORY_MAP[selectedCategory];
-
-    const matchesSearch = searchTerm.trim() === '' ||
-      (item.title && item.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (item.location && item.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (item.content && item.content.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    return matchesCategory && matchesSearch;
   });
 
   // 상세 페이지 이동
@@ -121,6 +140,8 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>데이터를 불러오는 중입니다... ⏳</div>
+      ) : errorMessage ? (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#dc2626' }}>{errorMessage}</div>
       ) : filteredItems.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#6b7280' }}>해당 조건에 맞는 게시물이 없습니다.</div>
       ) : (
@@ -158,6 +179,9 @@ export default function ItemList({ mode = 'lost', onNavigate }) {
                   <span style={{ fontWeight: 'bold', color: item.status === 'RESOLVED' ? '#6b7280' : '#2563eb' }}>
                     {item.status === 'RESOLVED' ? '반환 완료' : '찾는 중'}
                   </span>
+                  {searchTerm.trim() && typeof item.matchScore === 'number' && (
+                    <span style={{ color: '#6b7280' }}>{item.matchScore.toFixed(1)}% 관련도</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -184,5 +208,5 @@ const styles = {
   cardCategory: { fontSize: '12px', color: '#2563eb', fontWeight: 'bold', marginBottom: '4px' },
   cardTitle: { fontSize: '16px', fontWeight: 'bold', color: '#111827', margin: '0 0 8px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   cardInfo: { fontSize: '13px', color: '#4b5563', margin: '2px 0' },
-  cardFooter: { marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid #f3f4f6', fontSize: '13px' }
+  cardFooter: { marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid #f3f4f6', fontSize: '13px', display: 'flex', justifyContent: 'space-between', gap: '8px' }
 };

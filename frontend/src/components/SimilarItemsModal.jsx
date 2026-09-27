@@ -1,52 +1,37 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 
-// 카테고리 이름 변환용 맵핑
-const CATEGORY_MAP = {
-  1: '카드/신분증',
-  2: '이어폰/헤드폰',
-  3: '스마트폰/노트북/태블릿',
-  4: '지갑',
-  5: '책/노트/필기구',
-  6: '가방/파우치',
-  7: '의류/모자',
-  8: '기타 전자기기',
-  9: '기타'
-};
-
-export default function SimilarItemsModal({ isOpen, onClose, baseItemTitle, baseItemCategoryId, onNavigate }) {
+export default function SimilarItemsModal({ isOpen, onClose, baseItemId, baseItemTitle, onNavigate }) {
   const [similarItems, setSimilarItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // 모달이 열릴 때 백엔드에서 습득물 데이터 가져오기
   useEffect(() => {
     if (!isOpen) return;
 
+    let active = true;
     setLoading(true);
-    api.get('/api/items?type=FOUND')
+    setErrorMessage('');
+
+    api.get(`/api/items/${baseItemId}/similar?limit=12`)
       .then(res => {
-        const allFoundItems = res.data || [];
-        
-        // 💡 핵심: 분실물과 같은 카테고리(categoryId)를 가진 습득물만 필터링
-        const filtered = allFoundItems.filter(item => item.categoryId === baseItemCategoryId);
-        
-        // AI 기능 완성 전까지 가짜 일치율 점수(70~99) 임시 부여
-        const itemsWithFakeScore = filtered.map(item => ({
-          ...item,
-          matchScore: Math.floor(Math.random() * (99 - 70) + 70) 
-        }));
-
-        // 점수 높은 순으로 정렬
-        itemsWithFakeScore.sort((a, b) => b.matchScore - a.matchScore);
-
-        setSimilarItems(itemsWithFakeScore);
-        setLoading(false);
+        if (!active) return;
+        setSimilarItems(res.data || []);
       })
       .catch(err => {
         console.error("유사 습득물 로딩 실패", err);
-        setLoading(false);
+        if (!active) return;
+        setSimilarItems([]);
+        setErrorMessage(err.response?.data || '유사 습득물을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
-  }, [isOpen, baseItemCategoryId]);
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, baseItemId]);
 
   if (!isOpen) return null;
 
@@ -55,8 +40,6 @@ export default function SimilarItemsModal({ isOpen, onClose, baseItemTitle, base
     onClose();
     onNavigate('post-detail', id);
   };
-
-  const getCategoryName = (id) => CATEGORY_MAP[id] || '기타';
 
   return (
     <div style={styles.overlay} onClick={onClose}>
@@ -78,6 +61,8 @@ export default function SimilarItemsModal({ isOpen, onClose, baseItemTitle, base
         {/* 로딩 및 결과 없음 처리 */}
         {loading ? (
            <div style={{ textAlign: 'center', padding: '40px 0', color: '#6b7280' }}>습득물을 탐색하는 중입니다... ⏳</div>
+        ) : errorMessage ? (
+           <div style={{ textAlign: 'center', padding: '40px 0', color: '#dc2626' }}>{errorMessage}</div>
         ) : similarItems.length === 0 ? (
            <div style={{ textAlign: 'center', padding: '40px 0', color: '#6b7280' }}>비슷한 습득물이 아직 등록되지 않았습니다.</div>
         ) : (
@@ -91,10 +76,10 @@ export default function SimilarItemsModal({ isOpen, onClose, baseItemTitle, base
                     style={styles.cardImage} 
                   />
                   <span style={styles.badge}>습득</span>
-                  <span style={styles.matchBadge}>{item.matchScore}% 일치</span>
+                  <span style={styles.matchBadge}>{Number(item.matchScore || 0).toFixed(1)}% 일치</span>
                 </div>
                 <div style={styles.cardContent}>
-                  <span style={styles.cardCategory}>{getCategoryName(item.categoryId)}</span>
+                  <span style={styles.cardCategory}>{item.categoryName || '기타'}</span>
                   <h4 style={styles.cardTitle}>{item.title}</h4>
                   <p style={styles.cardInfo}>{item.location}</p>
                   <p style={styles.cardInfo}>{item.eventDate ? item.eventDate.split('T')[0] : '날짜 미상'}</p>

@@ -2,6 +2,7 @@ package findu.backend.item.service;
 
 import findu.backend.category.entity.Category;
 import findu.backend.category.repository.CategoryRepository;
+import findu.backend.ai.service.ItemEmbeddingService;
 import findu.backend.item.entity.ItemStatus;
 import findu.backend.item.entity.ItemType;
 import findu.backend.item.dto.ItemRequestDto;
@@ -25,6 +26,7 @@ public class ItemService {
     private final ItemRepository itemRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final ItemEmbeddingService itemEmbeddingService;
 
     // 새로운 게시물 생성
     @Transactional
@@ -64,6 +66,7 @@ public class ItemService {
                 .build();
 
         Item savedItem = itemRepository.save(item);
+        itemEmbeddingService.index(savedItem);
         return ItemResponseDto.from(savedItem);
     }
 
@@ -73,6 +76,22 @@ public class ItemService {
                 itemRepository.findByTypeOrderByCreatedAtDesc(type) : 
                 itemRepository.findAllByOrderByCreatedAtDesc();
         return items.stream().map(ItemResponseDto::from).toList();
+    }
+
+    @Transactional
+    public List<ItemResponseDto> searchItems(
+            ItemType type,
+            String query,
+            Long categoryId,
+            int limit
+    ) {
+        if (query == null || query.isBlank()) {
+            return getItems(type).stream()
+                    .filter(item -> categoryId == null || categoryId.equals(item.getCategoryId()))
+                    .toList();
+        }
+
+        return itemEmbeddingService.searchByText(type, query, categoryId, limit);
     }
 
     // 특정 게시물 상세 조회
@@ -104,7 +123,15 @@ public class ItemService {
                 category
         );
 
+        itemEmbeddingService.index(item);
         return ItemResponseDto.from(item);
+    }
+
+    @Transactional
+    public List<ItemResponseDto> getSimilarItems(Long id, int limit) {
+        Item item = itemRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
+        return itemEmbeddingService.findSimilar(item, limit);
     }
 
     // 특정 게시물 삭제

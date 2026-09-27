@@ -1,7 +1,8 @@
 package findu.backend.item.repository;
 
-import findu.backend.item.entity.ItemType;
 import findu.backend.item.entity.Item;
+import findu.backend.item.entity.ItemStatus;
+import findu.backend.item.entity.ItemType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
@@ -11,4 +12,6 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
     
     // 전체 최신순 목록 조회
     List<Item> findAllByOrderByCreatedAtDesc();
+
+    List<Item> findByTypeAndStatusOrderByCreatedAtDesc(ItemType type, ItemStatus status);
 }
