@@ -63,6 +63,13 @@ public class ChatService {
         }
     }
 
+    private void memberOrAdmin(ChatRoom room, Long userId) {
+        User user = u(userId);
+        if (user.getRole() != findu.backend.user.entity.Role.ADMIN) {
+            member(room, userId);
+        }
+    }
+
     /**
      * 채팅방 생성
      *
@@ -248,8 +255,8 @@ public class ChatService {
 
         ChatRoom room = room(roomId);
 
-        // 채팅방 참여자인지 확인
-        member(room, uid);
+        // 신고 관리 화면에서는 관리자도 대화 내역을 열람할 수 있다.
+        memberOrAdmin(room, uid);
 
         return msgs
                 .findByRoomIdOrderByCreatedAtAsc(roomId)
