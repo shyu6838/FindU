@@ -1,53 +1,20 @@
-import requests
 import io
-import os
-import pickle
-import faiss
 import torch
 import open_clip
-import numpy as np
 from PIL import Image
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from deep_translator import GoogleTranslator
+from pydantic import BaseModel
+from deep_translator import GoogleTranslator, MyMemoryTranslator
 
-# 영구 저장할 파일 경로 정의
-INDEX_FILE = "faiss_index.bin"
-MAP_FILE = "id_map.pkl"
-
-# 전역 변수 선언
-index = None
-id_map = []
-
-# 데이터 파일 자동 저장 헬퍼 함수
-def save_data():
-    global index, id_map
-    faiss.write_index(index, INDEX_FILE)
-    with open(MAP_FILE, "wb") as f:
-        pickle.dump(id_map, f)
-    print("💾 Faiss 인덱스 및 ID 매핑 파일이 성공적으로 저장되었습니다.")
-
-# 서버 시작/종료 수명주기(Lifespan) 관리
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global index, id_map
-    dimension = 512
-
-    # 1. 기존 저장 파일 존재 여부 확인 후 로드
-    if os.path.exists(INDEX_FILE) and os.path.exists(MAP_FILE):
-        index = faiss.read_index(INDEX_FILE)
-        with open(MAP_FILE, "rb") as f:
-            id_map = pickle.load(f)
-        print(f" 기존 Faiss 데이터 로드 완료! (등록된 분실물 수: {len(id_map)}개)")
-    else:
-        index = faiss.IndexFlatIP(dimension)
-        id_map = []
-        print("🆕 새로운 Faiss 인덱스를 생성했습니다.")
-
-    yield # 서버 동작 중...
-
-app = FastAPI(title="Capstone Lost & Found AI Server", version="1.0", lifespan=lifespan)
+# ---------------------------------------------------------
+# FastAPI App 생성 및 CORS 설정
+# ---------------------------------------------------------
+app = FastAPI(
+    title="Capstone Lost & Found AI Embedding Server",
+    description="OpenCLIP 기반 이미지 및 텍스트 벡터 임베딩 추출 전용 서버 (pgvector 연동용)",
+    version="2.0"
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,153 +24,108 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. OpenCLIP 모델 로드
+# ---------------------------------------------------------
+# OpenCLIP 모델 로드
+# ---------------------------------------------------------
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"사용 중인 장치: {device}")
+
+# OpenCLIP 모델 및 토크나이저 초기화
 model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
 model = model.to(device)
+model.eval()  # 추론 전용 모드
 tokenizer = open_clip.get_tokenizer('ViT-B-32')
 
 
+# ---------------------------------------------------------
+# Pydantic 데이터 모델
+# ---------------------------------------------------------
+class TextEmbeddingRequest(BaseModel):
+    text: str
+
+
+# ---------------------------------------------------------
+# API Endpoints
+# ---------------------------------------------------------
+
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "registered_items_count": index.ntotal if index else 0}
+    """AI 서버 상태 확인 헬스체크"""
+    return {
+        "status": "healthy",
+        "device": device,
+        "model": "ViT-B-32 (laion2b_s34b_b79k)",
+        "vector_dimension": 512
+    }
 
 
-# [API 1] 분실물 이미지 등록 (자동 파일 저장 로직 포함)
-@app.post("/api/ai/register")
-async def register_item(
-        item_id: int = Form(...),
-        file: UploadFile | None = File(None),
-        image_url: str | None = Form(None)
-):
-    global index, id_map
-
+@app.post("/api/ai/embedding/image")
+async def extract_image_embedding(file: UploadFile = File(...)):
+    """
+    [이미지 임베딩 추출 API]
+    백엔드에서 전달받은 이미지 파일로부터 512차원 Float 벡터 배열을 추출하여 반환합니다.
+    """
     try:
-        if file is not None:
-            content = await file.read()
-
-        elif image_url is not None:
-            response = requests.get(image_url, timeout=10)
-            response.raise_for_status()
-            content = response.content
-
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="file 또는 image_url이 필요합니다."
-            )
-
+        content = await file.read()
         image = Image.open(io.BytesIO(content)).convert("RGB")
 
         processed_image = preprocess(image).unsqueeze(0).to(device)
-
         with torch.no_grad():
             image_features = model.encode_image(processed_image)
             image_features /= image_features.norm(dim=-1, keepdim=True)
-            vector = image_features.cpu().numpy().astype("float32")
-
-        index.add(vector)
-        id_map.append(item_id)
-
-        save_data()
+            vector_list = image_features.cpu().numpy().flatten().tolist()
 
         return {
             "status": "success",
-            "item_id": item_id,
-            "message": f"Item {item_id} registered and saved."
+            "dimension": len(vector_list),
+            "embedding": vector_list
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"등록 실패: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"이미지 임베딩 추출 실패: {str(e)}")
 
 
-# [API 2] 자연어 검색 (번역 로직 포함)
-@app.get("/api/ai/search")
-def search_by_text(query: str, top_k: int = 5):
-    global index, id_map
-    if index is None or index.ntotal == 0:
-        return {"results": []}
+@app.post("/api/ai/embedding/text")
+def extract_text_embedding(request: TextEmbeddingRequest):
+    """
+    [텍스트/자연어 임베딩 추출 API]
+    한국어 검색어를 영어로 번역 후 512차원 Float 벡터 배열을 추출하여 반환합니다.
+    (번역 실패 시 원문 사용으로 예외 처리)
+    """
+    query_text = request.text.strip()
+    if not query_text:
+        raise HTTPException(status_code=400, detail="검색어가 비어있습니다.")
 
+    translated_text = query_text
+
+    # 1. Google 번역 시도
     try:
-        translated_query = GoogleTranslator(source='ko', target='en').translate(query)
-        print(f"인식된 검색어: {query} -> 모델 입력 검색어: {translated_query}")
+        translated_text = GoogleTranslator(source='ko', target='en').translate(query_text)
+        print(f"Google 번역 성공: '{query_text}' -> '{translated_text}'")
+    except Exception as e1:
+        print(f"Google 번역 실패 ({str(e1)}), MyMemory 번역 재시도...")
+        # 2. MyMemory 번역 시도
+        try:
+            translated_text = MyMemoryTranslator(source='ko-KR', target='en-US').translate(query_text)
+            print(f"MyMemory 번역 성공: '{query_text}' -> '{translated_text}'")
+        except Exception as e2:
+            print(f"모든 번역기 실패, 원문 텍스트 사용: '{query_text}'")
+            translated_text = query_text
 
-        text_tokens = tokenizer([translated_query]).to(device)
+    # 3. OpenCLIP 임베딩 추출
+    try:
+        text_tokens = tokenizer([translated_text]).to(device)
         with torch.no_grad():
             text_features = model.encode_text(text_tokens)
             text_features /= text_features.norm(dim=-1, keepdim=True)
-            query_vector = text_features.cpu().numpy().astype('float32')
-
-        search_k = min(top_k, index.ntotal)
-        D, I = index.search(query_vector, search_k)
-
-        results = []
-        for score, idx in zip(D[0], I[0]):
-            if idx == -1: continue
-            results.append({
-                "item_id": id_map[idx],
-                "score": float(score)
-            })
-
-        return {"query": query, "translated_query": translated_query, "results": results}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"검색 실패: {str(e)}")
-
-
-# [API 3] 이미지 기반 유사 분실물 검색 (Image-to-Image Search)
-@app.post("/api/ai/search/image")
-async def search_by_image(
-        file: UploadFile | None = File(None),
-        image_url: str | None = Form(None),
-        top_k: int = Form(5)
-):
-    global index, id_map
-
-    if index is None or index.ntotal == 0:
-        return {"results": []}
-
-    try:
-        if file is not None:
-            content = await file.read()
-
-        elif image_url is not None:
-            response = requests.get(image_url, timeout=10)
-            response.raise_for_status()
-            content = response.content
-
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="file 또는 image_url이 필요합니다."
-            )
-
-        query_image = Image.open(io.BytesIO(content)).convert("RGB")
-
-        processed_image = preprocess(query_image).unsqueeze(0).to(device)
-        with torch.no_grad():
-            image_features = model.encode_image(processed_image)
-            image_features /= image_features.norm(dim=-1, keepdim=True)
-            query_vector = image_features.cpu().numpy().astype('float32')
-
-        search_k = min(top_k, index.ntotal)
-        D, I = index.search(query_vector, search_k)
-
-        results = []
-        for score, idx in zip(D[0], I[0]):
-            if idx == -1: continue
-            results.append({
-                "item_id": id_map[idx],
-                "score": float(score)
-            })
+            vector_list = text_features.cpu().numpy().flatten().tolist()
 
         return {
-            "message": "이미지 기반 유사도 검색 성공",
-            "results": results
+            "original_text": query_text,
+            "translated_text": translated_text,
+            "dimension": len(vector_list),
+            "embedding": vector_list
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"이미지 검색 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"텍스트 임베딩 추출 실패: {str(e)}")
