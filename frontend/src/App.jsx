@@ -9,7 +9,7 @@ import ItemList from './pages/ItemList';
 import PostDetail from './pages/PostDetail'; 
 import ChatRoom from './pages/ChatRoom';
 import NotificationDropdown from './components/NotificationDropdown'; 
-import OAuthCallback from './pages/OAuthCallback';
+import OAuthCallback from './pages/OauthCallback';
 import AdminDashboard from './pages/AdminDashboard';
 import api from './api/axios';
 
@@ -31,11 +31,12 @@ const App = () => {
       setIsLoggedIn(true);
       api.get('/api/users/me')
         .then(res => {
-          if (res.data && (res.data.role === 'ADMIN' || (res.data.auth && res.data.auth.includes('ADMIN')))) {
-            setIsAdmin(true);
-          }
+          setIsAdmin(res.data?.role === 'ADMIN');
         })
-        .catch(err => console.error('권한 확인 실패:', err));
+        .catch(err => {
+          setIsAdmin(false);
+          console.error('권한 확인 실패:', err);
+        });
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -88,18 +89,15 @@ const App = () => {
     }
   };
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = async () => {
     setIsLoggedIn(true);
-    api.get('/api/users/me')
-      .then(res => {
-        if (res.data && (res.data.role === 'ADMIN' || (res.data.auth && res.data.auth.includes('ADMIN')))) {
-          setIsAdmin(true);
-        }
-      })
-      .catch(err => console.error('권한 확인 실패:', err));
-      
-    window.history.replaceState({ page: 'home', itemData: null }, document.title, '/');
-    handleNavigate('home');
+    try {
+      const res = await api.get('/api/users/me');
+      setIsAdmin(res.data?.role === 'ADMIN');
+    } catch (err) {
+      setIsAdmin(false);
+      console.error('권한 확인 실패:', err);
+    }
   };
 
   const handleLogout = async () => {
@@ -139,7 +137,7 @@ const App = () => {
         return <PostDetail itemId={typeof selectedItem === 'object' ? selectedItem?.id : selectedItem} onNavigate={handleNavigate} />;
       case 'edit-item': return <ReportForm setCurrentPage={handleNavigate} editData={selectedItem} />;
       case 'chat-room': return <ChatRoom changePage={handleNavigate} postInfo={selectedItem} />;
-      case 'admin-dashboard': return <AdminDashboard/>;
+      case 'admin-dashboard': return <AdminDashboard onNavigate={handleNavigate} />;
       default: return <Home changePage={handleNavigate} requireLogin={requireLogin} />;
     }
   };

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 export default function OAuthCallback({
+    onLoginSuccess,
     setIsLoggedIn,
     setCurrentPage,
 }) {
@@ -24,26 +25,6 @@ export default function OAuthCallback({
         const userId = params.get('userId');
         const email = params.get('email');
 
-        console.log(
-            'OAuthCallback accessToken:',
-            accessToken
-        );
-
-        console.log(
-            'OAuthCallback refreshToken:',
-            refreshToken
-        );
-
-        console.log(
-            'OAuthCallback userId:',
-            userId
-        );
-
-        console.log(
-            'OAuthCallback email:',
-            email
-        );
-
         // 토큰이 없는 경우
         if (!accessToken || !refreshToken) {
 
@@ -54,6 +35,7 @@ export default function OAuthCallback({
 
             if (savedAccessToken) {
                 setIsLoggedIn(true);
+                onLoginSuccess?.();
                 setCurrentPage('home');
                 return;
             }
@@ -94,6 +76,7 @@ export default function OAuthCallback({
 
         // 로그인 상태 변경
         setIsLoggedIn(true);
+        onLoginSuccess?.();
 
         // URL에서 토큰 제거
         window.history.replaceState(
@@ -105,7 +88,7 @@ export default function OAuthCallback({
         // 홈으로 이동
         setCurrentPage('home');
 
-    }, [setIsLoggedIn, setCurrentPage]);
+    }, [onLoginSuccess, setIsLoggedIn, setCurrentPage]);
 
     return (
         <div

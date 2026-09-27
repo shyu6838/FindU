@@ -261,8 +261,8 @@ export default function PostDetail({ itemId, onNavigate }) {
       <SimilarItemsModal 
         isOpen={isSimilarModalOpen} 
         onClose={() => setIsSimilarModalOpen(false)} 
+        baseItemId={postData.id}
         baseItemTitle={postData.title}
-        baseItemCategoryId={postData.categoryId} 
         onNavigate={onNavigate}
       />
 

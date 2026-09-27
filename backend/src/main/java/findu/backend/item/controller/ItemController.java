@@ -41,11 +41,27 @@ public class ItemController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<ItemResponseDto>> searchItems(
+            @RequestParam ItemType type,
+            @RequestParam String query,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "20") int limit) {
+        return ResponseEntity.ok(itemService.searchItems(type, query, categoryId, limit));
+    }
+
     // 게시물 상세 조회
     @GetMapping("/{id}")
     public ResponseEntity<ItemResponseDto> getItem(@PathVariable Long id) {
         ItemResponseDto response = itemService.getItem(id);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<List<ItemResponseDto>> getSimilarItems(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "10") int limit) {
+        return ResponseEntity.ok(itemService.getSimilarItems(id, limit));
     }
 
     // 게시물 수정

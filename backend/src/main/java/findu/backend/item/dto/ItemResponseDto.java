@@ -26,8 +26,13 @@ public class ItemResponseDto {
     private Long writerId;
     private String writerEmail;
     private LocalDateTime createdAt;
+    private Double matchScore;
 
     public static ItemResponseDto from(Item item) {
+        return from(item, null);
+    }
+
+    public static ItemResponseDto from(Item item, Double matchScore) {
         return ItemResponseDto.builder()
                 .id(item.getId())
                 .type(item.getType())
@@ -44,6 +49,7 @@ public class ItemResponseDto {
                 .writerId(item.getUser() != null ? item.getUser().getId() : null)
                 .writerEmail(item.getUser() != null ? item.getUser().getEmail() : null) 
                 .createdAt(item.getCreatedAt())
+                .matchScore(matchScore)
                 .build();
     }
 }

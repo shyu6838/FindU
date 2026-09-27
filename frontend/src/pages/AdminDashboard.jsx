@@ -7,6 +7,7 @@ export default function AdminDashboard({ onNavigate }) {
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // 채팅 대화 내역 모달 상태 관리
   const [isChatHistoryOpen, setIsChatHistoryOpen] = useState(false);
@@ -15,7 +16,7 @@ export default function AdminDashboard({ onNavigate }) {
 
   // 신고 처리 액션 상태 관리
   const [actions, setActions] = useState({
-    deletePost: false,
+    deleteTarget: false,
     decreaseTrust: false,
     rejectReport: false,
   });
@@ -27,11 +28,12 @@ export default function AdminDashboard({ onNavigate }) {
 
   const fetchReports = async () => {
     setLoading(true);
+    setErrorMessage('');
     try {
       const res = await api.get('/api/reports');
       setReports(res.data);
     } catch (err) {
-      // 에러 발생 시 빈 배열 유지
+      setErrorMessage('신고 내역을 불러오지 못했습니다. 관리자 권한을 확인해주세요.');
     } finally {
       setLoading(false);
     }
@@ -46,12 +48,12 @@ export default function AdminDashboard({ onNavigate }) {
   // 모달 닫기 및 상태 초기화
   const handleCloseModal = () => {
     setSelectedReport(null);
-    setActions({ deletePost: false, decreaseTrust: false, rejectReport: false });
+    setActions({ deleteTarget: false, decreaseTrust: false, rejectReport: false });
   };
 
   // 신고 처리 제출
   const handleProcessSubmit = async () => {
-    if (!actions.deletePost && !actions.decreaseTrust && !actions.rejectReport) {
+    if (!actions.deleteTarget && !actions.decreaseTrust && !actions.rejectReport) {
       alert("처리할 액션을 하나 이상 선택해주세요.");
       return;
     }
@@ -61,7 +63,7 @@ export default function AdminDashboard({ onNavigate }) {
       
       const res = await api.patch(`/api/reports/${selectedReport.id}/process`, {
         status: newStatus,
-        deleteTarget: selectedReport.targetType === 'ITEM' ? actions.deletePost : false,
+        deleteTarget: actions.deleteTarget,
         decreaseTrust: actions.decreaseTrust,
         sendNotification: true
       });
@@ -137,6 +139,7 @@ export default function AdminDashboard({ onNavigate }) {
         <h2 style={styles.contentTitle}>
           {activeTab === 'post' ? '게시글 신고 관리' : activeTab === 'chat' ? '채팅 신고 관리' : '처리 완료 내역'}
         </h2>
+        {errorMessage && <p style={styles.errorMessage}>{errorMessage}</p>}
         
         <div style={styles.tableWrapper}>
           <table style={styles.table}>
@@ -283,13 +286,10 @@ export default function AdminDashboard({ onNavigate }) {
               <div style={styles.actionBox}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: '15px' }}>패널티 부여 (중복 선택 가능)</h4>
                 
-                {/* 게시글 신고일 경우에만 게시글 삭제 옵션 렌더링 */}
-                {selectedReport.targetType === 'ITEM' && (
-                  <label style={styles.checkboxLabel}>
-                    <input type="checkbox" name="deletePost" checked={actions.deletePost} onChange={handleActionChange} />
-                    대상 게시글 삭제
-                  </label>
-                )}
+                <label style={styles.checkboxLabel}>
+                  <input type="checkbox" name="deleteTarget" checked={actions.deleteTarget} onChange={handleActionChange} />
+                  {selectedReport.targetType === 'ITEM' ? '대상 게시글 삭제' : '대상 대화방 삭제'}
+                </label>
 
                 <label style={styles.checkboxLabel}>
                   <input type="checkbox" name="decreaseTrust" checked={actions.decreaseTrust} onChange={handleActionChange} />
@@ -358,6 +358,7 @@ const styles = {
   activeMenuItem: { padding: '12px', marginBottom: '8px', borderRadius: '8px', cursor: 'pointer', color: '#ef4444', backgroundColor: '#fef2f2', fontSize: '15px', fontWeight: 'bold', transition: 'all 0.2s' },
   mainContent: { flex: 1, padding: '40px' },
   contentTitle: { fontSize: '24px', fontWeight: 'bold', color: '#111827', margin: '0 0 24px 0' },
+  errorMessage: { margin: '0 0 16px', color: '#b91c1c', fontSize: '14px' },
   tableWrapper: { backgroundColor: '#ffffff', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' },
   table: { width: '100%', borderCollapse: 'collapse', textAlign: 'left' },
   thead: { backgroundColor: '#f3f4f6', borderBottom: '1px solid #e5e7eb' },
