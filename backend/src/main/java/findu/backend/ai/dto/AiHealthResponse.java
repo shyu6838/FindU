@@ -12,4 +12,7 @@ public class AiHealthResponse {
 
     @JsonProperty("registered_items_count")
     private Integer registeredItemsCount;
+
+    @JsonProperty("vector_dimension")
+    private Integer vectorDimension;
 }

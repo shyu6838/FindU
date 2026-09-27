@@ -1,7 +1,8 @@
 package findu.backend.match.service;
 
 import findu.backend.ai.client.AiClient;
-import findu.backend.ai.dto.AiSearchResultDto;
+import findu.backend.ai.dto.AiImageEmbeddingResponse;
+import findu.backend.ai.dto.AiTextEmbeddingResponse;
 import findu.backend.founditem.entity.FoundItem;
 import findu.backend.founditem.repository.FoundItemRepository;
 import findu.backend.lostitem.entity.LostItem;
@@ -12,8 +13,12 @@ import findu.backend.match.repository.ItemMatchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.core.io.UrlResource;
+import org.springframework.util.StringUtils;
 
+import java.net.MalformedURLException;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -33,15 +38,11 @@ public class MatchService {
                         new IllegalArgumentException("분실물을 찾을 수 없습니다.")
                 );
 
-        String query =
-                lostItem.getTitle() + " " + lostItem.getDescription();
-
-        List<AiSearchResultDto> aiResults =
-                aiClient.searchText(query, 5).getResults();
-
         List<ItemMatch> matches =
-                aiResults.stream()
-                        .map(result -> createMatch(lostItem, result))
+                foundItemRepository.findAll().stream()
+                        .map(foundItem -> createMatch(lostItem, foundItem))
+                        .sorted(Comparator.comparing(ItemMatch::getFinalScore).reversed())
+                        .limit(5)
                         .toList();
 
         itemMatchRepository.saveAll(matches);
@@ -53,18 +54,10 @@ public class MatchService {
 
     private ItemMatch createMatch(
             LostItem lostItem,
-            AiSearchResultDto result
+            FoundItem foundItem
     ) {
-        FoundItem foundItem =
-                foundItemRepository.findById(result.getItemId())
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "습득물을 찾을 수 없습니다."
-                                )
-                        );
-
-        double imageScore = result.getScore();
         double textScore = calculateTextScore(lostItem, foundItem);
+        double imageScore = calculateImageScore(lostItem, foundItem, textScore);
         double locationScore = calculateLocationScore(lostItem, foundItem);
         double timeScore = calculateTimeScore(lostItem, foundItem);
 
@@ -89,18 +82,62 @@ public class MatchService {
             LostItem lostItem,
             FoundItem foundItem
     ) {
-        String lostText =
-                lostItem.getTitle() + " " + lostItem.getDescription();
+        AiTextEmbeddingResponse lostEmbedding = aiClient.embedText(toText(lostItem));
+        AiTextEmbeddingResponse foundEmbedding = aiClient.embedText(toText(foundItem));
+        return cosineSimilarity(lostEmbedding.embedding(), foundEmbedding.embedding());
+    }
 
-        String foundText =
-                foundItem.getTitle() + " " + foundItem.getDescription();
-
-        if (foundText.contains(lostItem.getTitle()) ||
-                lostText.contains(foundItem.getTitle())) {
-            return 1.0;
+    private double calculateImageScore(
+            LostItem lostItem,
+            FoundItem foundItem,
+            double fallbackScore
+    ) {
+        if (!StringUtils.hasText(lostItem.getImageUrl()) || !StringUtils.hasText(foundItem.getImageUrl())) {
+            return fallbackScore;
         }
 
-        return 0.5;
+        try {
+            UrlResource lostImage = new UrlResource(lostItem.getImageUrl());
+            UrlResource foundImage = new UrlResource(foundItem.getImageUrl());
+            AiImageEmbeddingResponse lostEmbedding = aiClient.embedImage(lostImage, lostImage.getFilename());
+            AiImageEmbeddingResponse foundEmbedding = aiClient.embedImage(foundImage, foundImage.getFilename());
+            return cosineSimilarity(lostEmbedding.embedding(), foundEmbedding.embedding());
+        } catch (MalformedURLException | RuntimeException e) {
+            return fallbackScore;
+        }
+    }
+
+    private String toText(LostItem item) {
+        return item.getTitle() + "\n" + item.getDescription() + "\n" + item.getLocation();
+    }
+
+    private String toText(FoundItem item) {
+        return item.getTitle() + "\n" + item.getDescription() + "\n" + item.getLocation();
+    }
+
+    private double cosineSimilarity(List<Double> left, List<Double> right) {
+        if (left == null || right == null || left.size() != 512 || right.size() != 512) {
+            throw new IllegalStateException("AI 서버가 512차원 임베딩을 반환하지 않았습니다.");
+        }
+
+        double dotProduct = 0;
+        double leftMagnitude = 0;
+        double rightMagnitude = 0;
+
+        for (int index = 0; index < left.size(); index++) {
+            double leftValue = left.get(index);
+            double rightValue = right.get(index);
+            dotProduct += leftValue * rightValue;
+            leftMagnitude += leftValue * leftValue;
+            rightMagnitude += rightValue * rightValue;
+        }
+
+        if (leftMagnitude == 0 || rightMagnitude == 0) {
+            return 0;
+        }
+
+        return Math.max(0, Math.min(1,
+                (dotProduct / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude)) + 1) / 2));
     }
 
     private double calculateLocationScore(
