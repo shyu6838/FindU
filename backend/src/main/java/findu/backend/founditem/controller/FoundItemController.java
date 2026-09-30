@@ -1,5 +1,7 @@
 package findu.backend.founditem.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import findu.backend.founditem.dto.*;
 import findu.backend.founditem.service.FoundItemService;
 import jakarta.validation.Valid;
@@ -13,11 +15,13 @@ import java.util.*;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/found-items")
+@Tag(name = "습득물", description = "습득물 게시물 등록, 조회, 검색 및 관리 API")
 public class FoundItemController {
 
     final FoundItemService s;
 
     @PostMapping
+    @Operation(summary = "습득물 등록")
     public FoundItemResponseDto create(
             @AuthenticationPrincipal Long uid,
             @Valid @RequestBody FoundItemRequestDto r
@@ -26,12 +30,14 @@ public class FoundItemController {
     }
 
     @GetMapping
+    @Operation(summary = "습득물 목록 조회")
     public List<FoundItemResponseDto> list() {
         return s.list();
     }
 
     // 습득물 키워드 검색
     @GetMapping("/search")
+    @Operation(summary = "습득물 키워드 검색")
     public List<FoundItemResponseDto> search(
             @RequestParam String keyword
     ) {
@@ -39,6 +45,7 @@ public class FoundItemController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "습득물 상세 조회")
     public FoundItemResponseDto get(
             @PathVariable Long id
     ) {
@@ -46,6 +53,7 @@ public class FoundItemController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "습득물 수정")
     public FoundItemResponseDto update(
             @AuthenticationPrincipal Long uid,
             @PathVariable Long id,
@@ -55,6 +63,7 @@ public class FoundItemController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "습득물 삭제")
     public ResponseEntity<Void> delete(
             @AuthenticationPrincipal Long uid,
             @PathVariable Long id

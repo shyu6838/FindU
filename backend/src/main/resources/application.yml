@@ -48,6 +48,14 @@ server:
   port: 8080
   forward-headers-strategy: framework
 
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+
 app:
   frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
 
