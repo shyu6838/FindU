@@ -1,5 +1,7 @@
 package findu.backend.trust.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import findu.backend.trust.dto.TrustEventResponse;
 import findu.backend.trust.service.TrustService;
 import findu.backend.user.repository.UserRepository;
@@ -12,6 +14,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/users/me/trust")
+@Tag(name = "신뢰도", description = "현재 사용자의 신뢰도 점수와 변동 내역 API")
 public class TrustController {
 
     private final UserRepository users;
@@ -19,6 +22,7 @@ public class TrustController {
 
     // 현재 내 신뢰도 점수 조회
     @GetMapping
+    @Operation(summary = "내 신뢰도 점수 조회")
     public Integer getTrustScore(
             @AuthenticationPrincipal Long uid
     ) {
@@ -31,6 +35,7 @@ public class TrustController {
 
     // 내 신뢰도 변동 내역 조회
     @GetMapping("/events")
+    @Operation(summary = "내 신뢰도 변동 내역 조회")
     public List<TrustEventResponse> getTrustEvents(
             @AuthenticationPrincipal Long uid
     ) {
