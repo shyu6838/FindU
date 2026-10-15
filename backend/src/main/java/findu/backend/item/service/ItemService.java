@@ -9,6 +9,7 @@ import findu.backend.item.dto.ItemRequestDto;
 import findu.backend.item.dto.ItemResponseDto;
 import findu.backend.item.entity.Item;
 import findu.backend.item.repository.ItemRepository;
+import findu.backend.notification.service.NotificationService;
 import findu.backend.user.entity.User;
 import findu.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,13 +28,13 @@ public class ItemService {
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final ItemEmbeddingService itemEmbeddingService;
+    private final NotificationService notificationService;
 
     // 새로운 게시물 생성
     @Transactional
     public ItemResponseDto createItem(ItemRequestDto requestDto, String userEmail) {
         User user = null;
 
-        // 이메일 기반으로 유저 정보 조회
         if (userEmail != null && !userEmail.equals("anonymousUser")) {
             user = userRepository.findByEmail(userEmail).orElse(null);
             if (user == null) {
@@ -44,13 +45,11 @@ public class ItemService {
             }
         }
 
-        // 카테고리 정보 조회
         Category category = null;
         if (requestDto.getCategoryId() != null) {
             category = categoryRepository.findById(requestDto.getCategoryId()).orElse(null);
         }
 
-        // 게시물 엔티티 생성 및 저장
         Item item = Item.builder()
                 .type(requestDto.getType())
                 .title(requestDto.getTitle())
@@ -78,13 +77,9 @@ public class ItemService {
         return items.stream().map(ItemResponseDto::from).toList();
     }
 
+    // 게시물 검색
     @Transactional
-    public List<ItemResponseDto> searchItems(
-            ItemType type,
-            String query,
-            Long categoryId,
-            int limit
-    ) {
+    public List<ItemResponseDto> searchItems(ItemType type, String query, Long categoryId, int limit) {
         if (query == null || query.isBlank()) {
             return getItems(type).stream()
                     .filter(item -> categoryId == null || categoryId.equals(item.getCategoryId()))
@@ -127,6 +122,7 @@ public class ItemService {
         return ItemResponseDto.from(item);
     }
 
+    // 유사 게시물 조회
     @Transactional
     public List<ItemResponseDto> getSimilarItems(Long id, int limit) {
         Item item = itemRepository.findById(id)
@@ -142,15 +138,31 @@ public class ItemService {
         itemRepository.delete(item);
     }
 
-    // 게시물 상태 업데이트
+    // 게시물 상태 업데이트 (기본)
     @Transactional
     public void updateItemStatus(Long id, ItemStatus status) {
+        updateItemStatus(id, status, null);
+    }
+
+    // 게시물 상태 업데이트 및 대상자 후기 요청 알림 발송
+    @Transactional
+    public void updateItemStatus(Long id, ItemStatus status, Long targetUserId) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
         
         item.updateStatus(status); 
+
+        if (status == ItemStatus.RESOLVED && targetUserId != null) {
+            notificationService.create(
+                    targetUserId,
+                    "REVIEW_REQUEST",
+                    "[" + item.getTitle() + "] 후기가 도착했습니다. 진행 과정은 어떠셨나요?",
+                    item.getId()
+            );
+        }
     }
 
+    // 게시물 답변 검증
     public boolean verifyItemAnswer(Long id, String answer) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));

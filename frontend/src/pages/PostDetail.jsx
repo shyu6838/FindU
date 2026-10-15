@@ -1,12 +1,13 @@
 // PostDetail.jsx
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import ReportModal from '../components/ReportModal';
 import VerifyModal from '../components/VerifyModal'; 
 import SimilarItemsModal from '../components/SimilarItemsModal'; 
-import ReviewModal from '../components/ReviewModal'; 
+import ReviewModal from '../components/ReviewModal';
 
+// 게시글 상세 정보 확인 및 권한별 기능 처리 컴포넌트
 export default function PostDetail({ itemId, onNavigate }) {
   const [postData, setPostData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,22 +15,20 @@ export default function PostDetail({ itemId, onNavigate }) {
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
   const [isSimilarModalOpen, setIsSimilarModalOpen] = useState(false); 
-  const [isReviewOpen, setIsReviewOpen] = useState(false); 
-  const [currentUser, setCurrentUser] = useState(null);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
+  // 게시글 정보 및 현재 로그인한 사용자 정보 조회
   useEffect(() => {
     if (!itemId) return;
-    
-    const savedVerifyStatus = localStorage.getItem(`verified_item_${itemId}`);
-    if (savedVerifyStatus === 'true') setIsVerified(true);
 
     const token = localStorage.getItem('accessToken');
     if (token) {
       api.get('/api/users/me')
         .then(res => {
-          setCurrentUser(res.data);
           setCurrentUserEmail(res.data.email);
+          setCurrentUserId(res.data.id);
         })
         .catch(() => {});
     }
@@ -44,15 +43,24 @@ export default function PostDetail({ itemId, onNavigate }) {
       });
   }, [itemId]);
 
+  // 계정별 본인 확인 상태 로드
+  useEffect(() => {
+    if (!itemId || !currentUserEmail) {
+      setIsVerified(false);
+      return;
+    }
+    const savedVerifyStatus = localStorage.getItem(`verified_item_${itemId}_${currentUserEmail}`);
+    setIsVerified(savedVerifyStatus === 'true');
+  }, [itemId, currentUserEmail]);
+
   if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>데이터를 불러오는 중입니다.</div>;
   if (!postData) return <div style={{ textAlign: 'center', padding: '50px' }}>게시물을 찾을 수 없습니다.</div>;
 
   const isLost = postData.type === 'LOST';
+  const isResolved = postData.status === 'RESOLVED';
   const typeLabel = isLost ? '분실' : '습득';
   const typeBgColor = isLost ? '#ef4444' : '#10b981';
-  
-  const isMyPost = (currentUser?.id && currentUser.id === postData.writerId) ||
-    (currentUserEmail && currentUserEmail === postData.writerEmail);
+  const isMyPost = currentUserEmail && currentUserEmail === postData.writerEmail;
 
   // 로그인 상태 확인
   const checkLogin = () => {
@@ -88,53 +96,30 @@ export default function PostDetail({ itemId, onNavigate }) {
     }
   };
 
-  // 완료 상태 취소
-  const handleCancelResolve = async () => {
-    if (!window.confirm("완료 처리를 취소하고 다시 '진행 중'으로 변경하시겠습니까?")) return;
-    try {
-      await api.patch(`/api/items/${itemId}/status?status=SEARCHING`);
-      setPostData(prev => ({ ...prev, status: 'SEARCHING' }));
-      alert("완료 처리가 취소되었습니다.");
-    } catch {
-      alert("상태 변경에 실패했습니다.");
-    }
-  };
-
-  // 본인 확인 인증 처리
-  const handleVerifySubmit = async (inputAnswer) => {
-    try {
-      const res = await api.post(`/api/items/${itemId}/verify`, { answer: inputAnswer });
-      if (!res.data) {
-        alert("정답이 일치하지 않습니다. 다시 시도해주세요.");
-        return;
-      }
-
+  // 본인 확인 답안 제출 및 검증
+  const handleVerifySubmit = (inputAnswer) => {
+    if (!postData.answer) return alert("등록된 정답 정보가 없습니다.");
+    if (inputAnswer.trim().toLowerCase() === postData.answer.trim().toLowerCase()) {
       alert("본인 확인에 성공했습니다. 이제 작성자와 채팅을 나눌 수 있습니다.");
       setIsVerified(true);
-      localStorage.setItem(`verified_item_${itemId}`, 'true');
+      if (currentUserEmail) {
+        localStorage.setItem(`verified_item_${itemId}_${currentUserEmail}`, 'true');
+      }
       setIsVerifyOpen(false);
-    } catch {
-      alert("본인 확인 처리에 실패했습니다.");
+    } else {
+      alert("정답이 일치하지 않습니다. 다시 시도해주세요.");
     }
   };
 
-  // 채팅방 진입 핸들러
-  const handleChatClick = async () => {
+  // 채팅 버튼 클릭 핸들러
+  const handleChatClick = () => {
+    if (isResolved || isMyPost) return;
     if (!checkLogin()) return; 
-    if (isMyPost) return; 
     if (!isLost && !isVerified) return alert("습득물은 먼저 본인 확인을 완료해야 채팅을 시작할 수 있습니다.");
-    if (!postData.writerId) return alert("작성자 정보를 확인할 수 없어 채팅을 시작할 수 없습니다.");
-
-    try {
-      const roomRes = await api.post('/api/chat-rooms', {
-        userId: postData.writerId,
-        itemId: postData.id,
-      });
-      onNavigate('chat-room', { post: postData, room: roomRes.data });
-    } catch {
-      alert("채팅방 생성에 실패했습니다.");
-    }
+    onNavigate('chat-room', postData);
   };
+
+  const isChatDisabled = isResolved || (!isLost && !isVerified);
 
   return (
     <div style={styles.page}>
@@ -145,10 +130,8 @@ export default function PostDetail({ itemId, onNavigate }) {
 
         {isMyPost && (
           <div style={{ display: 'flex', gap: '8px' }}>
-            {postData.status !== 'RESOLVED' ? (
-              <button style={styles.resolveBtn} onClick={() => setIsReviewOpen(true)}>✅ 완료 처리</button>
-            ) : (
-              <button style={styles.cancelBtn} onClick={handleCancelResolve}>↩️ 완료 취소</button>
+            {!isResolved && (
+              <button style={styles.resolveBtn} onClick={() => setIsReviewOpen(true)}>완료 처리</button>
             )}
             <button style={styles.editBtn} onClick={handleEdit}>수정</button>
             <button style={styles.deleteBtn} onClick={handleDelete}>삭제</button>
@@ -164,7 +147,7 @@ export default function PostDetail({ itemId, onNavigate }) {
         <div style={styles.infoSection}>
           <div style={styles.badgeGroup}>
             <span style={{ ...styles.badge, backgroundColor: typeBgColor }}>{typeLabel}</span>
-            <span style={styles.statusBadge}>{postData.status === 'RESOLVED' ? '완료' : '진행중'}</span>
+            <span style={styles.statusBadge}>{isResolved ? '완료' : '진행중'}</span>
             <span style={styles.categoryTag}>{postData.categoryName || '기타'}</span>
           </div>
 
@@ -196,15 +179,15 @@ export default function PostDetail({ itemId, onNavigate }) {
               <button 
                 style={{ 
                   ...styles.actionBtn, 
-                  backgroundColor: isMyPost ? '#111827' : '#f3f4f6', 
-                  color: isMyPost ? '#ffffff' : '#9ca3af',
-                  cursor: isMyPost ? 'pointer' : 'not-allowed'
+                  backgroundColor: (isMyPost && !isResolved) ? '#111827' : '#f3f4f6', 
+                  color: (isMyPost && !isResolved) ? '#ffffff' : '#9ca3af',
+                  cursor: (isMyPost && !isResolved) ? 'pointer' : 'not-allowed'
                 }} 
                 onClick={() => {
-                  if (!isMyPost) return;
+                  if (!isMyPost || isResolved) return;
                   setIsSimilarModalOpen(true);
                 }}
-                disabled={!isMyPost}
+                disabled={!isMyPost || isResolved}
               >
                 {isMyPost ? '유사 습득물 찾기' : '유사 습득물 찾기 (작성자 전용)'}
               </button>
@@ -212,12 +195,12 @@ export default function PostDetail({ itemId, onNavigate }) {
               <button 
                 style={{
                   ...styles.actionBtn, 
-                  backgroundColor: isMyPost ? '#f3f4f6' : (isVerified ? '#10b981' : '#2563eb'), 
-                  color: isMyPost ? '#9ca3af' : '#ffffff',
-                  cursor: isMyPost ? 'not-allowed' : 'pointer'
+                  backgroundColor: (isMyPost || isResolved) ? '#f3f4f6' : (isVerified ? '#10b981' : '#2563eb'), 
+                  color: (isMyPost || isResolved) ? '#9ca3af' : '#ffffff',
+                  cursor: (isMyPost || isResolved) ? 'not-allowed' : 'pointer'
                 }} 
                 onClick={() => { 
-                  if (isMyPost) return;
+                  if (isMyPost || isResolved) return;
                   if (!checkLogin()) return;
                   if (isVerified) { 
                     alert("이미 본인 확인이 완료되었습니다."); 
@@ -225,34 +208,35 @@ export default function PostDetail({ itemId, onNavigate }) {
                     setIsVerifyOpen(true); 
                   } 
                 }}
-                disabled={isMyPost}
+                disabled={isMyPost || isResolved}
               >
-                {isMyPost ? '본인 확인 (작성자)' : (isVerified ? '✅본인 확인 완료' : '본인 확인 질문 답하기')}
+                {isMyPost ? '본인 확인 (작성자)' : (isResolved ? '본인 확인 마감' : (isVerified ? '본인 확인 완료' : '본인 확인 질문 답하기'))}
               </button>
             )}
 
             {isMyPost ? (
-              <button style={{ ...styles.actionBtn, backgroundColor: '#f3f4f6', color: '#9ca3af', cursor: 'not-allowed' }}>
+              <button style={{ ...styles.actionBtn, backgroundColor: '#f3f4f6', color: '#9ca3af', cursor: 'not-allowed' }} disabled>
                 내가 작성한 게시글입니다
               </button>
             ) : (
               <button 
                 style={{ 
                   ...styles.actionBtn, 
-                  backgroundColor: (!isLost && !isVerified) ? '#e5e7eb' : '#2563eb', 
-                  color: (!isLost && !isVerified) ? '#9ca3af' : '#ffffff', 
-                  cursor: (!isLost && !isVerified) ? 'not-allowed' : 'pointer' 
+                  backgroundColor: isChatDisabled ? '#e5e7eb' : '#2563eb', 
+                  color: isChatDisabled ? '#9ca3af' : '#ffffff', 
+                  cursor: isChatDisabled ? 'not-allowed' : 'pointer' 
                 }} 
                 onClick={handleChatClick}
+                disabled={isChatDisabled}
               >
-                💬 작성자와 채팅하기
+                {isResolved ? '완료된 게시글입니다' : '작성자와 채팅하기'}
               </button>
             )}
           </div>
         </div>
       </div>
 
-      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetType="ITEM" targetTitle={postData.title} targetId={postData.id} />
+      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetType="게시글" targetTitle={postData.title} />
       
       {isVerifyOpen && (
         <VerifyModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} question={postData.question || '본인 확인 질문이 등록되지 않았습니다.'} onVerify={handleVerifySubmit} />
@@ -261,8 +245,8 @@ export default function PostDetail({ itemId, onNavigate }) {
       <SimilarItemsModal 
         isOpen={isSimilarModalOpen} 
         onClose={() => setIsSimilarModalOpen(false)} 
-        baseItemId={postData.id}
         baseItemTitle={postData.title}
+        baseItemCategoryId={postData.categoryId} 
         onNavigate={onNavigate}
       />
 
@@ -270,17 +254,17 @@ export default function PostDetail({ itemId, onNavigate }) {
         isOpen={isReviewOpen} 
         onClose={() => setIsReviewOpen(false)} 
         onResolve={handleResolve}
-        currentUserId={currentUser?.id}
+        currentUserId={currentUserId}
+        itemId={postData.id}
       />
     </div>
   );
 }
 
 const styles = {
-  page: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
+  page: { maxWidth: '1000px', margin: '0 auto', padding: '40px 20px', fontFamily: "'Pretendard', sans-serif" },
   backButton: { background: 'none', border: 'none', color: '#4b5563', fontSize: '15px', cursor: 'pointer', padding: 0, fontWeight: 'bold' },
   resolveBtn: { padding: '6px 14px', backgroundColor: '#10b981', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
-  cancelBtn: { padding: '6px 14px', backgroundColor: '#6b7280', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
   editBtn: { padding: '6px 14px', backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
   deleteBtn: { padding: '6px 14px', backgroundColor: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' },
   contentWrapper: { display: 'flex', gap: '40px', backgroundColor: '#fff', borderRadius: '16px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' },

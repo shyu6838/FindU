@@ -3,6 +3,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import api from '../api/axios';
+import ReviewModal from './ReviewModal'; 
+
+// 이메일에서 아이디 추출 후 마스킹 처리
+const maskUserId = (email) => {
+  if (!email) return '';
+  const idPart = email.split('@')[0];
+  if (idPart.length <= 2) {
+    return idPart[0] + '*'.repeat(Math.max(1, idPart.length - 1));
+  }
+  const visibleLen = Math.min(3, Math.floor(idPart.length / 2));
+  return idPart.slice(0, visibleLen) + '*'.repeat(idPart.length - visibleLen);
+};
+
+// 닉네임과 마스킹된 아이디 조합 문자열 생성
+const formatTargetDisplay = (nickname, email) => {
+  const maskedId = maskUserId(email);
+  const rawId = email ? email.split('@')[0] : '';
+  const validNickname = nickname && nickname !== rawId ? nickname : null;
+
+  if (validNickname && maskedId) {
+    return `${validNickname}(${maskedId})`;
+  }
+  if (validNickname) {
+    return validNickname;
+  }
+  if (maskedId) {
+    return `작성자(${maskedId})`;
+  }
+  return '게시글 작성자';
+};
 
 // 네비게이션바 알림 드롭다운 컴포넌트
 export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
@@ -10,16 +40,23 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const [notifications, setNotifications] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toast, setToast] = useState(null);
+  
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewTargetId, setReviewTargetId] = useState(null);
+  const [reviewTargetNickname, setReviewTargetNickname] = useState('');
+  const [reviewTargetItemId, setReviewTargetItemId] = useState(null);
+
   const dropdownRef = useRef(null);
   const toastTimerRef = useRef(null);
 
-  // 알림 목록 조회
+  // 알림 목록 조회 (채팅 매칭 알림 제외)
   const fetchNotifications = useCallback(async () => {
     try {
       setIsRefreshing(true);
       const res = await api.get('/api/notifications', { timeout: 5000 });
-      setNotifications(res.data || []);
-    } catch (error) {
+      const filtered = (res.data || []).filter(noti => noti.type !== 'CHAT_MATCHED');
+      setNotifications(filtered);
+    } catch {
       setNotifications([]);
     } finally {
       setIsRefreshing(false);
@@ -58,6 +95,8 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
         fetchNotifications();
         client.subscribe('/user/queue/notifications', (message) => {
           const notification = JSON.parse(message.body);
+          if (notification.type === 'CHAT_MATCHED') return;
+
           setNotifications((prev) => [
             notification,
             ...prev.filter((item) => item.id !== notification.id),
@@ -75,7 +114,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
     };
   }, [fetchNotifications, isLoggedIn, showToast]);
 
-  // 드롭다운 외부 영역 클릭 시 닫기 처리
+  // 외부 영역 클릭 시 드롭다운 닫기
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -89,7 +128,7 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const unreadCount = notifications.filter(noti => !noti.read).length;
   const hasUnread = unreadCount > 0;
 
-  // 알림 드롭다운 토글 및 로그인 상태 확인
+  // 드롭다운 토글 및 로그인 확인
   const handleToggle = () => {
     if (!isLoggedIn) {
       alert("로그인이 필요한 서비스입니다.");
@@ -111,8 +150,8 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
       try {
         await api.patch(`/api/notifications/${noti.id}/read`);
         setNotifications(prev => prev.map(item => item.id === noti.id ? { ...item, read: true } : item));
-      } catch (error) {
-        // 실패 시 무시
+      } catch {
+        // 읽음 처리 실패 시 무시
       }
     }
   };
@@ -131,9 +170,9 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   const handleDeleteAll = async () => {
     if (window.confirm('모든 알림을 삭제하시겠습니까?')) {
       try {
-        await api.delete('/api/notifications');
+        await api.delete('/api/notifications'); 
         setNotifications([]); 
-      } catch (error) {
+      } catch {
         alert('알림 전체 삭제에 실패했습니다.');
       }
     }
@@ -142,100 +181,154 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
   // 알림 유형별 분류 텍스트 반환
   const getCategoryText = (type) => {
     if (type === 'CHAT') return '[채팅]';
-    if (type === 'CHAT_MATCHED') return '[완료]';
     if (type === 'MATCH') return '[유사]';
+    if (type === 'REVIEW_REQUEST' || type === 'REVIEW' || type === 'REVIEW_ARRIVED') return '[후기]';
     if (type === 'REPORT_RESOLVED' || type === 'REPORT_PENALTY') return '[신고]';
     return '[알림]';
   };
 
   return (
-    <div style={containerStyle} ref={dropdownRef}>
-      <div 
-        style={navItemStyle} 
-        onClick={handleToggle}
-      >
-        알림
-        {isLoggedIn && hasUnread && <span style={badgeStyle}>{unreadCount}</span>}
+    <>
+      <div style={containerStyle} ref={dropdownRef}>
+        <div style={navItemStyle} onClick={handleToggle}>
+          알림
+          {isLoggedIn && hasUnread && <span style={badgeStyle}>{unreadCount}</span>}
+        </div>
+
+        {isOpen && (
+          <div style={dropdownStyle}>
+            <div style={headerStyle}>
+              <h4 style={headerTitleStyle}>알림</h4>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button style={actionBtnStyle} onClick={handleReadAll} disabled={!hasUnread}>
+                  모두 읽음
+                </button>
+                <button style={{ ...actionBtnStyle, color: '#ef4444' }} onClick={handleDeleteAll} disabled={notifications.length === 0}>
+                  모두 삭제
+                </button>
+              </div>
+            </div>
+
+            <ul style={listStyle}>
+              {notifications.length === 0 ? (
+                <li style={{ ...listItemStyle, cursor: 'default', color: '#9ca3af', justifyContent: 'center' }}>새 알림이 없습니다.</li>
+              ) : notifications.map((noti) => (
+                <li 
+                  key={noti.id} 
+                  style={{
+                    ...listItemStyle,
+                    backgroundColor: noti.read ? '#f3f4f6' : '#eff6ff',
+                    color: noti.read ? '#9ca3af' : '#374151',
+                    opacity: noti.read ? 0.7 : 1
+                  }}
+                  onClick={async () => {
+                    await handleRead(noti);
+                    setIsOpen(false);
+                    
+                    const targetId = noti.targetId || noti.relatedId;
+
+                    if (noti.type === 'CHAT') {
+                      if (targetId) {
+                        onNavigate('chat-room', { room: { id: targetId } });
+                      } else {
+                        onNavigate('mypage');
+                      }
+                    } else if (noti.type === 'REVIEW_REQUEST') {
+                      if (targetId) {
+                        try {
+                          const [meRes, itemRes, roomsRes] = await Promise.all([
+                            api.get('/api/users/me'),
+                            api.get(`/api/items/${targetId}`),
+                            api.get('/api/chat-rooms').catch(() => ({ data: [] }))
+                          ]);
+                          
+                          const myInfo = meRes.data;
+                          const itemData = itemRes.data;
+                          const writerId = itemData.writerId || itemData.userId;
+                          const writerEmail = itemData.writerEmail || itemData.userEmail;
+                          let nickname = itemData.writerNickname || itemData.authorNickname || itemData.nickname;
+
+                          // 서버의 후기 목록을 조회하여 이 게시글에 대해 이미 작성했는지 확인
+                          if (writerId && myInfo?.nickname) {
+                            const reviewsRes = await api.get(`/api/reviews/users/${writerId}`).catch(() => ({ data: [] }));
+                            const alreadyReviewed = (reviewsRes.data || []).some(
+                              r => r.reviewerNickname === myInfo.nickname && r.comment && r.comment.includes(`[#${targetId}]`)
+                            );
+                            if (alreadyReviewed) {
+                              alert("이미 후기를 작성하셨습니다.");
+                              return;
+                            }
+                          }
+
+                          if (!nickname && writerId && Array.isArray(roomsRes.data)) {
+                            const matchedRoom = roomsRes.data.find(
+                              r => String(r.itemId) === String(targetId) && (r.user1Id === writerId || r.user2Id === writerId)
+                            );
+                            if (matchedRoom) {
+                              nickname = matchedRoom.user1Id === writerId ? matchedRoom.user1Nickname : matchedRoom.user2Nickname;
+                            }
+                          }
+
+                          setReviewTargetId(writerId);
+                          setReviewTargetNickname(formatTargetDisplay(nickname, writerEmail));
+                          setReviewTargetItemId(targetId);
+                          setIsReviewModalOpen(true);
+                        } catch {
+                          alert("정보를 불러오는데 실패했습니다.");
+                        }
+                      }
+                    } else if (noti.type === 'REVIEW_ARRIVED' || noti.type === 'REVIEW' || noti.type === 'REPORT_RESOLVED' || noti.type === 'REPORT_PENALTY') {
+                      onNavigate('mypage');
+                    } else {
+                      if (targetId) {
+                        onNavigate('detail', targetId);
+                      } else {
+                        onNavigate('mypage');
+                      }
+                    }
+                  }}
+                >
+                  <div style={{ ...iconBoxStyle, filter: noti.read ? 'grayscale(100%)' : 'none' }}>
+                    {getCategoryText(noti.type)}
+                  </div>
+                  <div style={contentStyle}>
+                    <p style={{ ...messageStyle, color: noti.read ? '#6b7280' : '#374151' }}>{noti.message}</p>
+                    <span style={timeStyle}>{formatTime(noti.createdAt)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {isRefreshing && <div style={refreshingStyle}>알림을 불러오는 중...</div>}
+          </div>
+        )}
+        {toast && (
+          <button
+            type="button"
+            style={toastStyle}
+            onClick={() => {
+              setIsOpen(true);
+              setToast(null);
+            }}
+          >
+            <span style={toastIconStyle}>{getCategoryText(toast.type)}</span>
+            <span style={toastMessageStyle}>{toast.message}</span>
+          </button>
+        )}
       </div>
 
-      {isOpen && (
-        <div style={dropdownStyle}>
-          <div style={headerStyle}>
-            <h4 style={headerTitleStyle}>알림</h4>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button style={actionBtnStyle} onClick={handleReadAll} disabled={!hasUnread}>
-                모두 읽음
-              </button>
-              <button style={{ ...actionBtnStyle, color: '#ef4444' }} onClick={handleDeleteAll} disabled={notifications.length === 0}>
-                모두 삭제
-              </button>
-            </div>
-          </div>
-
-          <ul style={listStyle}>
-            {notifications.length === 0 ? (
-              <li style={{ ...listItemStyle, cursor: 'default', color: '#9ca3af', justifyContent: 'center' }}>새 알림이 없습니다.</li>
-            ) : notifications.map((noti) => (
-              <li 
-                key={noti.id} 
-                style={{
-                  ...listItemStyle,
-                  backgroundColor: noti.read ? '#f3f4f6' : '#eff6ff',
-                  color: noti.read ? '#9ca3af' : '#374151',
-                  opacity: noti.read ? 0.7 : 1
-                }}
-                onClick={async () => {
-                  await handleRead(noti);
-                  setIsOpen(false);
-                  
-                  if (noti.type === 'CHAT' || noti.type === 'CHAT_MATCHED') {
-                    if (noti.targetId) {
-                      onNavigate('chat-room', { room: { id: noti.targetId } });
-                    } else {
-                      onNavigate('mypage');
-                    }
-                  } else if (noti.type === 'REPORT_RESOLVED' || noti.type === 'REPORT_PENALTY') {
-                    onNavigate('mypage');
-                  } else {
-                    if (noti.targetId) {
-                      onNavigate('detail', noti.targetId);
-                    } else {
-                      onNavigate('mypage');
-                    }
-                  }
-                }}
-              >
-                <div style={{ ...iconBoxStyle, filter: noti.read ? 'grayscale(100%)' : 'none' }}>
-                  {getCategoryText(noti.type)}
-                </div>
-                <div style={contentStyle}>
-                  <p style={{ ...messageStyle, color: noti.read ? '#6b7280' : '#374151' }}>{noti.message}</p>
-                  <span style={timeStyle}>{formatTime(noti.createdAt)}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-          {isRefreshing && <div style={refreshingStyle}>알림을 불러오는 중...</div>}
-        </div>
-      )}
-      {toast && (
-        <button
-          type="button"
-          style={toastStyle}
-          onClick={() => {
-            setIsOpen(true);
-            setToast(null);
-          }}
-        >
-          <span style={toastIconStyle}>{getCategoryText(toast.type)}</span>
-          <span style={toastMessageStyle}>{toast.message}</span>
-        </button>
-      )}
-    </div>
+      <ReviewModal 
+        isOpen={isReviewModalOpen} 
+        onClose={() => setIsReviewModalOpen(false)} 
+        onResolve={() => setIsReviewModalOpen(false)}
+        isAuthor={false} 
+        targetUserId={reviewTargetId}
+        targetNickname={reviewTargetNickname}
+        itemId={reviewTargetItemId}
+      />
+    </>
   );
 }
 
-// 스타일 설정
 const containerStyle = { position: 'relative', display: 'flex', alignItems: 'center', marginLeft: '24px' };
 const navItemStyle = { cursor: 'pointer', fontWeight: '500', color: '#374151', fontSize: '15px', display: 'flex', alignItems: 'center', position: 'relative', paddingBottom: '4px' };
 const badgeStyle = { position: 'absolute', top: '-10px', right: '-16px', minWidth: '18px', height: '18px', padding: '0 5px', backgroundColor: '#ef4444', color: '#ffffff', borderRadius: '999px', fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' };
