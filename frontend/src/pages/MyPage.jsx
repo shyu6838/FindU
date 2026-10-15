@@ -8,6 +8,7 @@ import ProfileEditModal from '../components/ProfileEditModal';
 const MyPage = ({ onNavigate }) => {
   // 상태 관리
   const [userInfo, setUserInfo] = useState(null);
+  const [allItems, setAllItems] = useState([]);
   const [myPosts, setMyPosts] = useState([]);
   const [chatRooms, setChatRooms] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -24,10 +25,11 @@ const MyPage = ({ onNavigate }) => {
       setUserInfo(user);
 
       const itemsRes = await api.get('/api/items');
-      const allItems = itemsRes.data || [];
+      const itemsData = itemsRes.data || [];
+      setAllItems(itemsData);
 
       if (user && user.email) {
-        const filteredPosts = allItems.filter(item => item.writerEmail === user.email);
+        const filteredPosts = itemsData.filter(item => item.writerEmail === user.email);
         setMyPosts(filteredPosts);
       }
 
@@ -38,7 +40,7 @@ const MyPage = ({ onNavigate }) => {
       ]);
 
       setChatRooms(roomsRes.data || []);
-      setNotifications(notificationsRes.data || []);
+      setNotifications((notificationsRes.data || []).filter(noti => noti.type !== 'CHAT_MATCHED'));
       setReviews(reviewsRes.data || []);
     } catch (err) {
       console.error('마이페이지 데이터 로드 실패:', err);
@@ -64,6 +66,33 @@ const MyPage = ({ onNavigate }) => {
   const getPartnerName = (room) => {
     if (!userInfo?.id) return '상대방';
     return room.user1Id === userInfo.id ? room.user2Nickname : room.user1Nickname;
+  };
+
+  // 후기 코멘트에서 게시글 번호 추출 후 물품명과 깔끔한 후기 내용으로 변환
+  const parseReviewInfo = (review) => {
+    const rawComment = review.comment || '';
+    const match = rawComment.match(/\[#(\d+)\]/);
+    const itemId = match ? match[1] : null;
+    const cleanComment = rawComment.replace(/\s*\[#\d+\]/g, '').trim();
+
+    let itemTitle = null;
+    if (itemId) {
+      const foundItem = allItems.find(item => String(item.id) === String(itemId));
+      if (foundItem) {
+        itemTitle = foundItem.title;
+      } else {
+        const foundRoom = chatRooms.find(room => String(room.itemId) === String(itemId));
+        if (foundRoom && foundRoom.itemTitle) {
+          itemTitle = foundRoom.itemTitle;
+        }
+      }
+    }
+
+    return {
+      itemId,
+      itemTitle,
+      cleanComment: cleanComment || '평가만 남긴 후기입니다.'
+    };
   };
 
   // 상세 페이지 및 채팅방 이동 핸들러
@@ -147,11 +176,23 @@ const MyPage = ({ onNavigate }) => {
           <div style={styles.emptyText}>아직 받은 후기가 없습니다.</div>
         ) : (
           <ul style={styles.modalListContainer}>
-            {reviews.map(review => (
-              <li key={review.id} style={styles.modalListItem}>
-                "{review.comment}"
-              </li>
-            ))}
+            {reviews.map(review => {
+              const { itemId, itemTitle, cleanComment } = parseReviewInfo(review);
+              return (
+                <li 
+                  key={review.id} 
+                  style={{ ...styles.modalListItem, cursor: itemId ? 'pointer' : 'default' }}
+                  onClick={() => itemId && handleCardClick(itemId)}
+                >
+                  {itemTitle && (
+                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#2563eb' }}>
+                      [{itemTitle}]
+                    </div>
+                  )}
+                  <div style={{ color: '#374151', fontSize: '14.5px' }}>"{cleanComment}"</div>
+                </li>
+              );
+            })}
           </ul>
         );
         break;
@@ -263,11 +304,19 @@ const MyPage = ({ onNavigate }) => {
           <ul style={styles.listContainer}>
             {reviews.length === 0 ? (
               <li style={{ ...styles.listItem, cursor: 'default', color: '#9ca3af' }}>아직 받은 후기가 없습니다.</li>
-            ) : reviews.slice(0, 3).map((review) => (
-              <li key={review.id} style={styles.listItem}>
-                "{review.comment}"
-              </li>
-            ))}
+            ) : reviews.slice(0, 3).map((review) => {
+              const { itemId, itemTitle, cleanComment } = parseReviewInfo(review);
+              return (
+                <li 
+                  key={review.id} 
+                  style={{ ...styles.listItem, cursor: itemId ? 'pointer' : 'default' }}
+                  onClick={() => itemId && handleCardClick(itemId)}
+                >
+                  {itemTitle && <strong style={{ color: '#2563eb', marginRight: '6px' }}>[{itemTitle}]</strong>}
+                  "{cleanComment}"
+                </li>
+              );
+            })}
           </ul>
         </div>
 
