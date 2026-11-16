@@ -13,6 +13,12 @@ public interface ChatRequestRepository
 
     List<ChatRequest> findByRequesterIdOrderByCreatedAtDesc(Long requesterId);
 
+    boolean existsByRequesterIdAndItemIdAndStatus(Long requesterId, Long itemId, ChatRequest.Status status);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select r from ChatRequest r where r.id = :id")
+    Optional<ChatRequest> lockById(@org.springframework.data.repository.query.Param("id") Long id);
+
     Optional<ChatRequest> findByRequesterIdAndReceiverIdAndStatus(
             Long requesterId,
             Long receiverId,

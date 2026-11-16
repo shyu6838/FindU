@@ -11,6 +11,9 @@ public record ChatRequestResponse(
         Long receiverId,
         String receiverNickname,
         String status,
+        Long itemId,
+        String evidence,
+        Long roomId,
         LocalDateTime createdAt
 ) {
 
@@ -22,6 +25,9 @@ public record ChatRequestResponse(
                 x.getReceiver().getId(),
                 x.getReceiver().getNickname(),
                 x.getStatus().name(),
+                x.getItemId(),
+                x.getEvidence(),
+                x.getRoomId(),
                 x.getCreatedAt()
         );
     }

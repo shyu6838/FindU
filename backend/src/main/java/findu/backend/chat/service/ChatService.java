@@ -82,6 +82,15 @@ public class ChatService {
             CreateRoomRequest r
     ) {
 
+        return createRoom(uid, r, false);
+    }
+
+    @Transactional
+    public ChatRoomResponse createAfterReview(Long requesterId, Long ownerId, Long itemId) {
+        return createRoom(requesterId, new CreateRoomRequest(ownerId, itemId, null), true);
+    }
+
+    private ChatRoomResponse createRoom(Long uid, CreateRoomRequest r, boolean approved) {
         if (uid.equals(r.userId())) {
             throw new IllegalArgumentException(
                     "본인과 채팅방을 만들 수 없습니다."
@@ -94,7 +103,8 @@ public class ChatService {
         // 2. 상대방 사용자
         User user2 = u(r.userId());
 
-        Item chatItem = r.itemId() == null ? null : item(r.itemId());
+        Item chatItem = r.itemId() == null ? null : items.lockById(r.itemId())
+                .orElseThrow(() -> new IllegalArgumentException("게시글을 찾을 수 없습니다."));
 
         if (chatItem != null && (chatItem.getUser() == null
                 || !chatItem.getUser().getId().equals(user2.getId()))) {
@@ -127,6 +137,19 @@ public class ChatService {
             return ChatRoomResponse.from(
                     existingRoom.get()
             );
+        }
+
+        if (chatItem != null && chatItem.getType() == findu.backend.item.entity.ItemType.FOUND) {
+            if (chatItem.getStatus() != findu.backend.item.entity.ItemStatus.SEARCHING) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.CONFLICT, "반환이 완료된 게시글입니다.");
+            }
+            if (!approved && (r.answer() == null || r.answer().isBlank()
+                    || chatItem.getAnswer() == null
+                    || !chatItem.getAnswer().strip().equalsIgnoreCase(r.answer().strip()))) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN, "답변이 일치하지 않습니다.");
+            }
         }
 
         // 5. 기존 채팅방이 없으면 새로 생성

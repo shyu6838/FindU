@@ -29,6 +29,17 @@ public class ChatRequest extends BaseEntity {
     @Column(nullable = false, length = 20)
     private Status status;
 
+    private Long itemId;
+
+    @Column(length = 500)
+    private String evidence;
+
+    private Long roomId;
+
+    public void linkRoom(Long roomId) {
+        this.roomId = roomId;
+    }
+
     public enum Status {
         PENDING,
         ACCEPTED,

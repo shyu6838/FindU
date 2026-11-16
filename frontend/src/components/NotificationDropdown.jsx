@@ -233,6 +233,8 @@ export default function NotificationDropdown({ onNavigate, isLoggedIn }) {
                       } else {
                         onNavigate('mypage');
                       }
+                    } else if (noti.type === 'OWNERSHIP_REVIEW' && targetId) {
+                      onNavigate('post-detail', targetId);
                     } else if (noti.type === 'REVIEW_REQUEST') {
                       if (targetId) {
                         try {

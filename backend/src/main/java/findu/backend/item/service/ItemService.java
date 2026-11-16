@@ -90,17 +90,22 @@ public class ItemService {
     }
 
     // 특정 게시물 상세 조회
-    public ItemResponseDto getItem(Long id) {
+    public ItemResponseDto getItem(Long id, Long uid) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
-        return ItemResponseDto.from(item);
+        return ItemResponseDto.from(item, null, item.getUser() != null && item.getUser().getId().equals(uid));
     }
 
     // 특정 게시물 수정
     @Transactional
-    public ItemResponseDto updateItem(Long id, ItemRequestDto requestDto, String userEmail) {
+    public ItemResponseDto updateItem(Long id, ItemRequestDto requestDto, Long uid) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("해당 게시글이 존재하지 않습니다. id=" + id));
+
+        if (item.getUser() == null || !item.getUser().getId().equals(uid)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "작성자만 게시글을 수정할 수 있습니다.");
+        }
 
         Category category = null;
         if (requestDto.getCategoryId() != null) {
