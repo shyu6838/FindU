@@ -33,6 +33,10 @@ public class ItemResponseDto {
     }
 
     public static ItemResponseDto from(Item item, Double matchScore) {
+        return from(item, matchScore, false);
+    }
+
+    public static ItemResponseDto from(Item item, Double matchScore, boolean includeAnswer) {
         return ItemResponseDto.builder()
                 .id(item.getId())
                 .type(item.getType())
@@ -42,7 +46,7 @@ public class ItemResponseDto {
                 .eventDate(item.getEventDate())
                 .imageUrl(item.getImageUrl())
                 .question(item.getQuestion())
-                .answer(item.getAnswer())
+                .answer(includeAnswer ? item.getAnswer() : null)
                 .status(item.getStatus())
                 .categoryId(item.getCategory() != null ? item.getCategory().getId() : null)
                 .categoryName(item.getCategory() != null ? item.getCategory().getName() : null)

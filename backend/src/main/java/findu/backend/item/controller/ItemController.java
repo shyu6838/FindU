@@ -14,6 +14,7 @@ import findu.backend.verification.dto.VerificationAnswerRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -64,8 +65,8 @@ public class ItemController {
     @GetMapping("/{id}")
     @Operation(summary = "게시물 상세 조회")
     @SecurityRequirements
-    public ResponseEntity<ItemResponseDto> getItem(@PathVariable Long id) {
-        ItemResponseDto response = itemService.getItem(id);
+    public ResponseEntity<ItemResponseDto> getItem(@PathVariable Long id, @AuthenticationPrincipal Long uid) {
+        ItemResponseDto response = itemService.getItem(id, uid);
         return ResponseEntity.ok(response);
     }
 
@@ -85,9 +86,8 @@ public class ItemController {
     public ResponseEntity<ItemResponseDto> updateItem(
             @PathVariable Long id,
             @RequestBody ItemRequestDto requestDto,
-            Authentication authentication) {
-        String userEmail = authentication != null ? authentication.getName() : null;
-        ItemResponseDto response = itemService.updateItem(id, requestDto, userEmail);
+            @AuthenticationPrincipal Long uid) {
+        ItemResponseDto response = itemService.updateItem(id, requestDto, uid);
         return ResponseEntity.ok(response);
     }
 

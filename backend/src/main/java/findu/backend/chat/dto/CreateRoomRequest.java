@@ -4,10 +4,11 @@ import jakarta.validation.constraints.NotNull;
 
 public record CreateRoomRequest(
         @NotNull Long userId,
-        Long itemId
+        Long itemId,
+        String answer
 ) {
 
     public CreateRoomRequest(Long userId) {
-        this(userId, null);
+        this(userId, null, null);
     }
 }

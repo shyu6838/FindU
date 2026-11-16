@@ -3,46 +3,68 @@
 import { useState } from 'react';
 
 // 본인 확인(습득물 주인 검증) 팝업 모달 컴포넌트
-export default function VerifyModal({ isOpen, onClose, question, onVerify }) {
+export default function VerifyModal({ isOpen, onClose, question, onVerify, onReview, pendingReview }) {
   const [inputAnswer, setInputAnswer] = useState('');
+  const [evidence, setEvidence] = useState('');
+  const [showReview, setShowReview] = useState(!question);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  // 정답 제출 핸들러
-  const handleSubmit = () => {
-    if (!inputAnswer.trim()) {
-      alert("정답을 입력해주세요.");
-      return;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting || (showReview && pendingReview)) return;
+    const value = (showReview ? evidence : inputAnswer).trim();
+    if (!value) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await (showReview ? onReview(value) : onVerify(value));
+    } catch (requestError) {
+      const status = requestError.response?.status;
+      if (!showReview && status === 403) setError('답변이 일치하지 않습니다. 다른 방법으로 확인을 요청할 수 있어요.');
+      else if (showReview && status === 409) setError('이미 검토 중인 요청이 있습니다.');
+      else setError('제출하지 못했습니다. 게시글 상태를 확인한 뒤 다시 시도해 주세요.');
+    } finally {
+      setSubmitting(false);
     }
-    onVerify(inputAnswer);
   };
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.modal}>
-        <h3 style={styles.title}>본인 확인 진행</h3>
-        <p style={styles.desc}>
-          이 물건의 주인이 맞으신가요?<br/>
-          습득자가 남긴 아래 질문에 올바른 답변을 입력하시면 채팅이 활성화됩니다.
-        </p>
-        
-        <div style={styles.questionBox}>
-          <span style={styles.qLabel}>Q.</span> {question}
-        </div>
-
-        <input 
-          type="text" 
-          placeholder="정답을 입력하세요" 
-          value={inputAnswer}
-          onChange={(e) => setInputAnswer(e.target.value)}
-          style={styles.input}
-        />
-
+      <form role="dialog" aria-modal="true" aria-labelledby="verify-title" style={styles.modal} onSubmit={handleSubmit}>
+        <h3 id="verify-title" style={styles.title}>{showReview ? '다른 방법으로 확인 요청' : '분실물 확인 질문'}</h3>
+        {showReview ? (
+          <>
+            <label htmlFor="review-evidence" style={styles.desc}>
+              게시글에 공개되지 않은 특징이나 분실한 장소·시간을 적어주세요. 카드번호나 비밀번호는 입력하지 마세요.
+            </label>
+            <textarea id="review-evidence" style={styles.input} rows={4} maxLength={500} required
+              value={evidence} onChange={event => setEvidence(event.target.value)} disabled={submitting || pendingReview} />
+            {pendingReview && <p role="status">이미 검토 중인 요청이 있습니다.</p>}
+          </>
+        ) : (
+          <>
+            <label htmlFor="verify-answer" style={{ ...styles.questionBox, display: 'block' }}>{question}</label>
+            <input id="verify-answer" value={inputAnswer} onChange={event => setInputAnswer(event.target.value)}
+              style={styles.input} required disabled={submitting} />
+          </>
+        )}
+        {error && <p role="alert">{error}</p>}
+        {question && (
+          <button type="button" disabled={submitting}
+            onClick={() => { setShowReview(!showReview); setError(''); }}>
+            {showReview ? '질문에 답하기' : '다른 방법으로 확인 요청'}
+          </button>
+        )}
         <div style={styles.buttonGroup}>
-          <button style={styles.cancelBtn} onClick={onClose}>취소</button>
-          <button style={styles.submitBtn} onClick={handleSubmit}>확인</button>
+          <button type="button" style={styles.cancelBtn} disabled={submitting} onClick={onClose}>닫기</button>
+          <button type="submit" style={styles.submitBtn} disabled={submitting || (showReview && pendingReview)}>
+            {submitting ? '제출 중…' : showReview ? '확인 요청 보내기' : '답변 확인'}
+          </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

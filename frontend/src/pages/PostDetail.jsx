@@ -13,7 +13,12 @@ export default function PostDetail({ itemId, onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
+  const [verification, setVerification] = useState(null);
+  const [reviewError, setReviewError] = useState('');
+  const [processingId, setProcessingId] = useState(null);
+  const reviewState = verification?.itemId === itemId ? verification : null;
+  const verifiedRoom = reviewState?.room;
+  const isVerified = Boolean(verifiedRoom);
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [isSimilarModalOpen, setIsSimilarModalOpen] = useState(false); 
@@ -43,15 +48,38 @@ export default function PostDetail({ itemId, onNavigate }) {
       });
   }, [itemId]);
 
-  // 계정별 본인 확인 상태 로드
   useEffect(() => {
-    if (!itemId || !currentUserEmail) {
-      setIsVerified(false);
-      return;
-    }
-    const savedVerifyStatus = localStorage.getItem(`verified_item_${itemId}_${currentUserEmail}`);
-    setIsVerified(savedVerifyStatus === 'true');
-  }, [itemId, currentUserEmail]);
+    if (!currentUserId || !postData || postData.type !== 'FOUND' || postData.id !== Number(itemId)) return;
+    let active = true;
+    const owner = postData.writerId === currentUserId;
+    const direction = owner ? 'received' : 'sent';
+
+    const load = () => {
+      setReviewError('');
+      Promise.all([
+        api.get('/api/chat-requests/' + direction),
+        owner ? Promise.resolve({ data: [] }) : api.get('/api/chat-rooms'),
+      ]).then(([requests, rooms]) => {
+        if (!active) return;
+        const rows = requests.data.filter(request => request.itemId === postData.id);
+        const room = rooms.data.find(entry => entry.itemId === postData.id);
+        setVerification(previous => ({
+          itemId,
+          rows,
+          room: room || (previous?.itemId === itemId ? previous.room : null),
+        }));
+      }).catch(() => {
+        if (active) setReviewError('확인 요청을 불러오지 못했습니다.');
+      });
+    };
+
+    load();
+    window.addEventListener('focus', load);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', load);
+    };
+  }, [itemId, currentUserId, postData]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}>데이터를 불러오는 중입니다.</div>;
   if (!postData) return <div style={{ textAlign: 'center', padding: '50px' }}>게시물을 찾을 수 없습니다.</div>;
@@ -96,30 +124,49 @@ export default function PostDetail({ itemId, onNavigate }) {
     }
   };
 
-  // 본인 확인 답안 제출 및 검증
-  const handleVerifySubmit = (inputAnswer) => {
-    if (!postData.answer) return alert("등록된 정답 정보가 없습니다.");
-    if (inputAnswer.trim().toLowerCase() === postData.answer.trim().toLowerCase()) {
-      alert("본인 확인에 성공했습니다. 이제 작성자와 채팅을 나눌 수 있습니다.");
-      setIsVerified(true);
-      if (currentUserEmail) {
-        localStorage.setItem(`verified_item_${itemId}_${currentUserEmail}`, 'true');
-      }
-      setIsVerifyOpen(false);
-    } else {
-      alert("정답이 일치하지 않습니다. 다시 시도해주세요.");
+  const handleVerifySubmit = async (answer) => {
+    const response = await api.post('/api/chat-rooms', {
+      userId: postData.writerId,
+      itemId: postData.id,
+      answer,
+    });
+    setVerification({ itemId, rows: reviewState?.rows || [], room: response.data });
+    setIsVerifyOpen(false);
+  };
+
+  const handleReviewSubmit = async (evidence) => {
+    const response = await api.post('/api/chat-requests/ownership-review', {
+      itemId: postData.id,
+      evidence,
+    });
+    setVerification({ itemId, rows: [response.data, ...(reviewState?.rows || [])] });
+    setIsVerifyOpen(false);
+  };
+
+  const handleReviewDecision = async (requestId, decision) => {
+    setProcessingId(requestId);
+    setReviewError('');
+    try {
+      const response = await api.patch('/api/chat-requests/' + requestId + '/' + decision);
+      setVerification(previous => ({
+        ...previous,
+        rows: previous.rows.map(row => row.id === requestId ? response.data : row),
+      }));
+    } catch {
+      setReviewError('요청을 처리하지 못했습니다. 게시글 상태와 요청을 다시 확인해 주세요.');
+    } finally {
+      setProcessingId(null);
     }
   };
 
-  // 채팅 버튼 클릭 핸들러
   const handleChatClick = () => {
-    if (isResolved || isMyPost) return;
-    if (!checkLogin()) return; 
-    if (!isLost && !isVerified) return alert("습득물은 먼저 본인 확인을 완료해야 채팅을 시작할 수 있습니다.");
-    onNavigate('chat-room', postData);
+    if (isResolved || isMyPost || !checkLogin()) return;
+    if (isLost) onNavigate('chat-room', postData);
+    else if (verifiedRoom) onNavigate('chat-room', { room: verifiedRoom, post: postData });
   };
 
   const isChatDisabled = isResolved || (!isLost && !isVerified);
+  const pendingReview = reviewState?.rows.some(request => request.status === 'PENDING');
 
   return (
     <div style={styles.page}>
@@ -236,10 +283,24 @@ export default function PostDetail({ itemId, onNavigate }) {
         </div>
       </div>
 
+      {reviewError && <p role="alert">{reviewError}</p>}
+      {!isLost && !isMyPost && pendingReview && <p role="status">습득자가 확인 요청을 검토 중입니다.</p>}
+      {!isLost && !isMyPost && !pendingReview && !isVerified && reviewState?.rows[0]?.status === 'REJECTED' && (
+        <p role="status">확인 요청이 거절됐습니다. 새로운 단서가 있으면 다시 요청할 수 있습니다.</p>
+      )}
+      {!isLost && isMyPost && reviewState?.rows.filter(request => request.status === 'PENDING').map(request => (
+        <section key={request.id} style={{ padding: '16px', border: '1px solid #d1d5db', borderRadius: '12px', margin: '16px 0' }}>
+          <h3>{request.requesterNickname}님의 분실물 확인 요청</h3>
+          <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{request.evidence}</p>
+          <button disabled={isResolved || processingId !== null} onClick={() => handleReviewDecision(request.id, 'accept')}>수락하고 채팅방 열기</button>{' '}
+          <button disabled={processingId !== null} onClick={() => handleReviewDecision(request.id, 'reject')}>거절</button>
+        </section>
+      ))}
+
       <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetType="게시글" targetTitle={postData.title} />
       
       {isVerifyOpen && (
-        <VerifyModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} question={postData.question || '본인 확인 질문이 등록되지 않았습니다.'} onVerify={handleVerifySubmit} />
+        <VerifyModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} question={postData.question} onVerify={handleVerifySubmit} onReview={handleReviewSubmit} pendingReview={pendingReview} />
       )}
       
       <SimilarItemsModal 

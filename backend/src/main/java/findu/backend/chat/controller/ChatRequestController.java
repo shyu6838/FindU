@@ -32,6 +32,20 @@ public class ChatRequestController {
         );
     }
 
+    @PostMapping("/ownership-review")
+    public ChatRequestResponse requestOwnershipReview(
+            @AuthenticationPrincipal Long uid,
+            @jakarta.validation.Valid @RequestBody OwnershipReviewRequest request
+    ) {
+        return service.requestOwnershipReview(uid, request.itemId(), request.evidence());
+    }
+
+    public record OwnershipReviewRequest(
+            @jakarta.validation.constraints.NotNull Long itemId,
+            @jakarta.validation.constraints.NotBlank
+            @jakarta.validation.constraints.Size(max = 500) String evidence
+    ) {}
+
     @GetMapping("/received")
     @Operation(summary = "받은 채팅 요청 목록 조회")
     public List<ChatRequestResponse> received(

@@ -22,6 +22,7 @@ public class ChatRequestService {
     private final VerificationService verificationService;
     private final NotificationService notificationService;
     private final ChatService chatService;
+    private final findu.backend.item.repository.ItemRepository items;
 
     private User user(Long id) {
         return users.findById(id)
@@ -86,6 +87,33 @@ public class ChatRequestService {
         return ChatRequestResponse.from(saved);
     }
 
+    @Transactional
+    public ChatRequestResponse requestOwnershipReview(Long uid, Long itemId, String evidence) {
+        var item = items.lockById(itemId).orElseThrow(() ->
+                new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "게시글을 찾을 수 없습니다."));
+        if (item.getType() != findu.backend.item.entity.ItemType.FOUND
+                || item.getStatus() != findu.backend.item.entity.ItemStatus.SEARCHING
+                || item.getUser() == null || item.getUser().getId().equals(uid)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "확인 요청을 보낼 수 없는 게시글입니다.");
+        }
+        if (repo.existsByRequesterIdAndItemIdAndStatus(uid, itemId, ChatRequest.Status.PENDING)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "이미 검토 중인 요청이 있습니다.");
+        }
+        ChatRequest request = repo.save(ChatRequest.builder()
+                .requester(user(uid))
+                .receiver(item.getUser())
+                .itemId(itemId)
+                .evidence(evidence.strip())
+                .status(ChatRequest.Status.PENDING)
+                .build());
+        notificationService.create(item.getUser().getId(), "OWNERSHIP_REVIEW",
+                "분실물 확인 요청이 도착했습니다. 게시글에서 확인해 주세요.", itemId);
+        return ChatRequestResponse.from(request);
+    }
+
     // 받은 요청
     @Transactional(readOnly = true)
     public List<ChatRequestResponse> received(Long uid) {
@@ -113,7 +141,7 @@ public class ChatRequestService {
             Long requestId
     ) {
 
-        ChatRequest request = repo.findById(requestId)
+        ChatRequest request = repo.lockById(requestId)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "채팅 요청을 찾을 수 없습니다."
@@ -134,13 +162,10 @@ public class ChatRequestService {
 
         request.accept();
 
-        // 수락 시 ChatRoom 생성
-        chatService.create(
-                request.getReceiver().getId(),
-                new findu.backend.chat.dto.CreateRoomRequest(
-                        request.getRequester().getId()
-                )
-        );
+        var room = request.getItemId() == null
+                ? chatService.create(uid, new findu.backend.chat.dto.CreateRoomRequest(request.getRequester().getId()))
+                : chatService.createAfterReview(request.getRequester().getId(), uid, request.getItemId());
+        request.linkRoom(room.id());
 
         // 요청자에게 알림
         notificationService.create(
@@ -160,7 +185,7 @@ public class ChatRequestService {
             Long requestId
     ) {
 
-        ChatRequest request = repo.findById(requestId)
+        ChatRequest request = repo.lockById(requestId)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "채팅 요청을 찾을 수 없습니다."
