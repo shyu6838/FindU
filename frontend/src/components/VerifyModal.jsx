@@ -52,10 +52,10 @@ export default function VerifyModal({ isOpen, onClose, question, onVerify, onRev
           </>
         )}
         {error && <p role="alert">{error}</p>}
-        {question && (
+        {question && !showReview && (
           <button type="button" disabled={submitting}
-            onClick={() => { setShowReview(!showReview); setError(''); }}>
-            {showReview ? '질문에 답하기' : '다른 방법으로 확인 요청'}
+            onClick={() => { setShowReview(true); setError(''); }}>
+            다른 방법으로 확인 요청
           </button>
         )}
         <div style={styles.buttonGroup}>
